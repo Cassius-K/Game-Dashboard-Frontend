@@ -15,6 +15,18 @@ function App() {
       console.error("Error fetching profile", err);
     }
   };
+  
+  const syncData = async () => {
+    setServerMessage("Syncing with Steam... please wait.");
+    try {
+        const res = await fetch(`${API_URL}/api/steam/sync/${steamId}`, { method: 'POST' });
+        const data = await res.json();
+        alert(data.message);
+        setServerMessage("Sync Complete!");
+    } catch (err) {
+        setServerMessage("Sync Failed.");
+    }
+};
 
   return (
     <div className="App">
@@ -29,6 +41,10 @@ function App() {
         />
         <button onClick={fetchSteamProfile}>Fetch Steam Profile</button>
       </div>
+	  
+	<button onClick={syncData} style={{ backgroundColor: '#2a475e' }}>
+		Sync Account to Database
+	</button>
 
       {profile && (
         <div className="profile-card">
