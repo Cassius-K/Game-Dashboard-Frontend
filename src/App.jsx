@@ -1,26 +1,43 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './App.css'
 
 function App() {
-  const [serverMessage, setServerMessage] = useState("Loading...");
-
-  // We use VITE_API_URL so Render knows where to point, but defaults to localhost for testing
+  const [steamId, setSteamId] = useState('76561198035414121'); // Default test ID
+  const [profile, setProfile] = useState(null);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  useEffect(() => {
-    fetch(`${API_URL}/api/status`)
-      .then(res => res.json())
-      .then(data => setServerMessage(data.message))
-      .catch(err => setServerMessage("Cannot connect to server."));
-  }, []);
+  const fetchSteamProfile = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/steam/profile/${steamId}`);
+      const data = await res.json();
+      setProfile(data);
+    } catch (err) {
+      console.error("Error fetching profile", err);
+    }
+  };
 
   return (
     <div className="App">
-      <h1>🎮 The Giga Game Dashboard</h1>
+      <h1>🎮 Giga Game Dashboard</h1>
+      
       <div className="card">
-        <h2>Backend Status:</h2>
-        <p style={{ color: 'lightgreen', fontWeight: 'bold' }}>{serverMessage}</p>
+        <input 
+          type="text" 
+          value={steamId} 
+          onChange={(e) => setSteamId(e.target.value)} 
+          placeholder="Enter SteamID64"
+        />
+        <button onClick={fetchSteamProfile}>Fetch Steam Profile</button>
       </div>
+
+      {profile && (
+        <div className="profile-card">
+          <img src={profile.avatarfull} alt="Avatar" />
+          <h2>{profile.personaname}</h2>
+          <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
+          <a href={profile.profileurl} target="_blank">View Steam Profile</a>
+        </div>
+      )}
     </div>
   )
 }
