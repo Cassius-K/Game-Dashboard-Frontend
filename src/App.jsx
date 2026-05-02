@@ -3,7 +3,7 @@ import './App.css'
 
 function App() {
   // 1. State Management
-  const [steamId, setSteamId] = useState(''); // REMOVED the hardcoded number
+  const [steamId, setSteamId] = useState(''); 
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
@@ -50,7 +50,6 @@ function App() {
       if (data.token) {
         setJwtToken(data.token);
         setIsLoggedIn(true);
-        // NEW: Check if they have a linked Steam ID
         if (data.linkedSteamId) {
             setSteamId(data.linkedSteamId);
             setServerMessage(`Welcome back, ${data.username}!`);
@@ -74,6 +73,7 @@ function App() {
     setProfile(null);
     setGamesLibrary([]);
     setSelectedAchievements(null);
+    setLeaderboard([]);
     setServerMessage("Logged out.");
   };
   
@@ -130,12 +130,10 @@ function App() {
   const loadLibrary = async () => {
     setServerMessage("Loading games and stats from database...");
     try {
-        // Fetch Games
         const res = await fetch(`${API_URL}/api/games/${steamId}`);
         const data = await res.json();
         setGamesLibrary(data);
 
-        // Fetch Stats
         const statsRes = await fetch(`${API_URL}/api/stats/${steamId}`);
         const statsData = await statsRes.json();
         setUserStats(statsData);
@@ -179,10 +177,8 @@ function App() {
     <div className="App">
       <h1>🎮 Giga Game Dashboard</h1>
       
-      {/* Feedback Message Area */}
       <p style={{ color: 'lightgreen', fontWeight: 'bold', height: '20px' }}>{serverMessage}</p>
 
-      {/* --- LOGIC GATE: LOGIN OR DASHBOARD --- */}
       {!isLoggedIn ? (
         /* LOGIN / SIGNUP VIEW */
         <div className="card" style={{ padding: '30px', backgroundColor: '#1b2838', borderRadius: '10px', width: '320px', margin: '0 auto' }}>
@@ -212,10 +208,7 @@ function App() {
           <button onClick={handleLogout} style={{ float: 'right', backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
           <div style={{ clear: 'both' }}></div>
 
-          {/* Control Panel */}
           <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px' }}>
-            
-            {/* If they haven't linked an account yet, show the Link button */}
             {!steamId ? (
                 <div>
                     <h3>Link Your Steam Account</h3>
@@ -230,23 +223,19 @@ function App() {
                     <p style={{ fontSize: '12px', color: '#888' }}>You only have to do this once!</p>
                 </div>
             ) : (
-                /* If they HAVE linked an account, show the normal dashboard controls */
                 <div>
                     <h3>Linked Steam ID: <span style={{ color: '#66c0f4' }}>{steamId}</span></h3>
                     <div style={{ marginTop: '15px' }}>
                         <button onClick={fetchSteamProfile}>1. Fetch Profile</button>
                         <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
                         <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
-						<button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
-						</div>
+                        <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
                     </div>
                 </div>
             )}
           </div>
 
-          {/* Profile & Stats Display Section */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-              {/* Profile Card */}
               {profile && (
                 <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
                   <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
@@ -256,14 +245,11 @@ function App() {
                 </div>
               )}
 
-              {/* NEW: Stats Hub Card */}
               {userStats && (
                 <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
                     <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
-                    
                     <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
                     <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
-                    
                     <div style={{ display: 'flex', justifyContent: 'space-around' }}>
                         <div>
                             <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
@@ -278,7 +264,6 @@ function App() {
               )}
           </div>
 
-          {/* Games Library Grid Display */}
           {gamesLibrary.length > 0 && (
               <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '30px', justifyContent: 'center' }}>
                   {gamesLibrary.map(game => (
@@ -298,12 +283,10 @@ function App() {
               </div>
           )}
 
-          {/* Achievement Display Section */}
           {selectedAchievements && (
             <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
                 <h2>🏆 Achievements for {activeGameName}</h2>
                 <p>Total: {selectedAchievements.length} | Unlocked: {selectedAchievements.filter(a => a.achieved === 1).length}</p>
-                
                 {selectedAchievements.length === 0 ? (
                     <p>This game does not have Steam achievements.</p>
                 ) : (
@@ -329,9 +312,7 @@ function App() {
                 )}
             </div>
           )}
-        </div>
-      )}
-	  {/* --- NEW: LEADERBOARD SECTION --- */}
+
           {leaderboard.length > 0 && (
             <div className="leaderboard-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px', border: '1px solid #cca43b' }}>
                 <h2 style={{ color: '#cca43b' }}>🌍 Global Leaderboard</h2>
@@ -357,8 +338,10 @@ function App() {
                 </table>
             </div>
           )}
+        </div>
+      )}
     </div>
   )
 }
 
-export default App
+export default App;
