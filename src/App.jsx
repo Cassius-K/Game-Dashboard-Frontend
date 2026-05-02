@@ -7,6 +7,7 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
+  const [userStats, setUserStats] = useState(null);
   const [selectedAchievements, setSelectedAchievements] = useState(null);
   const [activeGameName, setActiveGameName] = useState("");
   
@@ -126,14 +127,21 @@ function App() {
   };
 
   const loadLibrary = async () => {
-    setServerMessage("Loading games from database...");
+    setServerMessage("Loading games and stats from database...");
     try {
+        // Fetch Games
         const res = await fetch(`${API_URL}/api/games/${steamId}`);
         const data = await res.json();
         setGamesLibrary(data);
+
+        // Fetch Stats
+        const statsRes = await fetch(`${API_URL}/api/stats/${steamId}`);
+        const statsData = await statsRes.json();
+        setUserStats(statsData);
+
         setServerMessage(`Loaded ${data.length} games.`);
     } catch (err) {
-        setServerMessage("Failed to load games from database.");
+        setServerMessage("Failed to load data from database.");
     }
   };
 
@@ -221,15 +229,39 @@ function App() {
             )}
           </div>
 
-          {/* Profile Display Section */}
-          {profile && (
-            <div className="profile-card" style={{ marginTop: '20px', padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px' }}>
-              <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
-              <h2>{profile.personaname}</h2>
-              <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
-              <a href={profile.profileurl} target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>View External Steam Profile</a>
-            </div>
-          )}
+          {/* Profile & Stats Display Section */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+              {/* Profile Card */}
+              {profile && (
+                <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
+                  <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
+                  <h2>{profile.personaname}</h2>
+                  <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
+                  <a href={profile.profileurl} target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>View Steam Profile</a>
+                </div>
+              )}
+
+              {/* NEW: Stats Hub Card */}
+              {userStats && (
+                <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
+                    <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
+                    
+                    <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
+                    <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                        <div>
+                            <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
+                            <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Unlocked</p>
+                        </div>
+                        <div>
+                            <h3 style={{ margin: '0', color: '#fff' }}>{userStats.total}</h3>
+                            <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
+                        </div>
+                    </div>
+                </div>
+              )}
+          </div>
 
           {/* Games Library Grid Display */}
           {gamesLibrary.length > 0 && (
