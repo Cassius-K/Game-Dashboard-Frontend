@@ -3,8 +3,8 @@ import './App.css'
 
 function App() {
   // 1. State Management
-  const [steamId, setSteamId] = useState(''); // This is the "Active" ID in the search box
-  const [linkedId, setLinkedId] = useState(''); // This is the logged-in user's own linked Steam ID
+  const [steamId, setSteamId] = useState(''); // The "Active" Steam ID we are currently looking at
+  const [linkedId, setLinkedId] = useState(''); // The logged-in user's own linked Steam ID
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
@@ -12,6 +12,10 @@ function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [selectedAchievements, setSelectedAchievements] = useState(null);
   const [activeGameName, setActiveGameName] = useState("");
+
+  // Search Convenience States
+  const [searchQuery, setSearchQuery] = useState(''); // Text typed in the search box
+  const [searchResults, setSearchResults] = useState([]); // List of matching players found
   
   // Auth State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -52,13 +56,13 @@ function App() {
         setJwtToken(data.token);
         setIsLoggedIn(true);
         setUsername(data.username);
-        // If the user already has a linked Steam ID in the DB, load it
         if (data.linkedSteamId) {
             setLinkedId(data.linkedSteamId);
-            setSteamId(data.linkedSteamId); // Default the search bar to their own account
+            setSteamId(data.linkedSteamId); 
+            setSearchQuery(data.linkedSteamId); // Set search box to their ID too
             setServerMessage(`Welcome back, ${data.username}!`);
         } else {
-            setServerMessage(`Welcome ${data.username}! Please search and link a Steam account.`);
+            setServerMessage(`Welcome ${data.username}! Please link your Steam account.`);
         }
       } else {
         alert(data.message);
@@ -78,12 +82,13 @@ function App() {
     setGamesLibrary([]);
     setLinkedId("");
     setSteamId("");
+    setSearchQuery("");
+    setSearchResults([]);
     setSelectedAchievements(null);
     setLeaderboard([]);
     setServerMessage("Logged out.");
   };
   
-  // Links whatever is currently in the search box to the logged-in user's Giga account
   const handleLinkSteam = async () => {
       if (!steamId) return alert("Please enter a Steam ID to link.");
       setServerMessage("Linking account...");
@@ -104,9 +109,42 @@ function App() {
       }
   };
 
-  // 4. Steam Dashboard Functions
+  // 4. Steam & Search Functions
+
+  // Search for players by name or Vanity URL
+  const handleSearch = async () => {
+    if (!searchQuery) return;
+    setServerMessage("Searching for players...");
+    setSearchResults([]);
+
+    // If it's exactly 17 digits, treat it as a direct SteamID
+    if (/^\d{17}$/.test(searchQuery)) {
+        setSteamId(searchQuery);
+        setServerMessage("Steam ID detected.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/api/search/players/${searchQuery}`);
+        const data = await res.json();
+        setSearchResults(data);
+        if (data.length === 0) setServerMessage("No players found.");
+        else setServerMessage(`Found ${data.length} matches.`);
+    } catch (err) {
+        setServerMessage("Search failed.");
+    }
+  };
+
+  // Select a player from the search dropdown
+  const selectPlayer = (selectedId) => {
+    setSteamId(selectedId);
+    setSearchQuery(selectedId);
+    setSearchResults([]);
+    setServerMessage("Player selected. Click 'Load Profile' to continue.");
+  };
+
   const fetchSteamProfile = async () => {
-    if (!steamId) return alert("Please enter a Steam ID.");
+    if (!steamId) return alert("Please search or enter a Steam ID first.");
     setServerMessage("Fetching profile info...");
     try {
       const res = await fetch(`${API_URL}/api/steam/profile/${steamId}`);
@@ -185,9 +223,9 @@ function App() {
       }
   };
 
-  // Helper to jump back to user's own profile
   const backToMyProfile = () => {
       setSteamId(linkedId);
+      setSearchQuery(linkedId);
       setServerMessage("Switched back to your profile.");
   };
 
@@ -195,10 +233,11 @@ function App() {
     <div className="App">
       <h1>🎮 Giga Game Dashboard</h1>
       
+      {/* Top Notification Message */}
       <p style={{ color: 'lightgreen', fontWeight: 'bold', height: '20px' }}>{serverMessage}</p>
 
       {!isLoggedIn ? (
-        /* LOGIN / SIGNUP VIEW */
+        /* --- 1. LOGIN / SIGNUP VIEW --- */
         <div className="card" style={{ padding: '30px', backgroundColor: '#1b2838', borderRadius: '10px', width: '320px', margin: '0 auto' }}>
           <h2>Account Access</h2>
           <input 
@@ -221,32 +260,49 @@ function App() {
           </div>
         </div>
       ) : (
-        /* MAIN DASHBOARD VIEW */
+        /* --- 2. MAIN DASHBOARD VIEW (LOGGED IN) --- */
         <div>
-          {/* Top Info Bar */}
+          {/* Dashboard Header Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#171a21', borderRadius: '5px', marginBottom: '10px' }}>
               <span>User: <strong>{username}</strong> | Linked Steam: <strong>{linkedId || "None"}</strong></span>
               <button onClick={handleLogout} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
           </div>
 
-          <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px' }}>
+          {/* Player Search and Command Panel */}
+          <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
                 <div>
                     <h3>Player Search</h3>
-                    <input 
-                        type="text" 
-                        value={steamId} 
-                        onChange={(e) => setSteamId(e.target.value)} 
-                        placeholder="Enter ANY SteamID64"
-                        style={{ padding: '10px', width: '250px' }}
-                    />
-                    {/* Only show Link button if they don't have a linked ID yet */}
-                    {!linkedId && <button onClick={handleLinkSteam} style={{ marginLeft: '10px', backgroundColor: '#cca43b', color: 'black' }}>Link to My Account</button>}
-                    
-                    {/* Show Back button if they are looking at someone else */}
-                    {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ marginLeft: '10px' }}>Back to Me</button>}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                        <input 
+                            type="text" 
+                            value={searchQuery} 
+                            onChange={(e) => setSearchQuery(e.target.value)} 
+                            placeholder="Search Name or SteamID64"
+                            style={{ padding: '10px', width: '250px' }}
+                        />
+                        <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
+                    </div>
 
-                    <div style={{ marginTop: '15px' }}>
-                        <button onClick={fetchSteamProfile}>1. Fetch Profile</button>
+                    {/* Search Results Dropdown List */}
+                    {searchResults.length > 0 && (
+                        <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)' }}>
+                            {searchResults.map(player => (
+                                <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <img src={player.avatar} alt="av" style={{ width: '25px' }} />
+                                    <span>{player.personaname}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    
+                    <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                        <p>Active ID: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
+                        
+                        {/* Control Buttons */}
+                        {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
+                        {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+
+                        <button onClick={fetchSteamProfile}>1. Load Profile</button>
                         <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
                         <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
                         <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
@@ -254,6 +310,7 @@ function App() {
                 </div>
           </div>
 
+          {/* Profile Card and Statistics View */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
               {profile && (
                 <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
@@ -283,6 +340,7 @@ function App() {
               )}
           </div>
 
+          {/* Game Library Grid Display */}
           {gamesLibrary.length > 0 && (
               <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '30px', justifyContent: 'center' }}>
                   {gamesLibrary.map(game => (
@@ -302,6 +360,7 @@ function App() {
               </div>
           )}
 
+          {/* Achievements Detail View */}
           {selectedAchievements && (
             <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
                 <h2>🏆 Achievements for {activeGameName}</h2>
@@ -332,6 +391,7 @@ function App() {
             </div>
           )}
 
+          {/* Global Community Leaderboard Table */}
           {leaderboard.length > 0 && (
             <div className="leaderboard-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px', border: '1px solid #cca43b' }}>
                 <h2 style={{ color: '#cca43b' }}>🌍 Global Leaderboard</h2>
