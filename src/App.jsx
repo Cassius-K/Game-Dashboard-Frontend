@@ -327,21 +327,6 @@ function App() {
                     </div>
                 </div>
           </div>
-                    
-                    <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
-                        <p>Active ID: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
-                        
-                        {/* Control Buttons */}
-                        {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
-                        {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
-
-                        <button onClick={fetchSteamProfile}>1. Load Profile</button>
-                        <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
-                        <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
-                        <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
-                    </div>
-                </div>
-          </div>
 
           {/* Profile Card and Statistics View */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
