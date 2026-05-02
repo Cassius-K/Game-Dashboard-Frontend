@@ -7,7 +7,6 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
-  const [gamesLibrary, setGamesLibrary] = useState([]);
   const [selectedAchievements, setSelectedAchievements] = useState(null);
   const [activeGameName, setActiveGameName] = useState("");
 
