@@ -3,7 +3,7 @@ import './App.css'
 
 function App() {
   // 1. State Management
-  const [steamId, setSteamId] = useState('76561198035414121'); // Default test ID
+  const [steamId, setSteamId] = useState(''); // REMOVED the hardcoded number
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
@@ -48,7 +48,13 @@ function App() {
       if (data.token) {
         setJwtToken(data.token);
         setIsLoggedIn(true);
-        setServerMessage(`Welcome back, ${data.username}!`);
+        // NEW: Check if they have a linked Steam ID
+        if (data.linkedSteamId) {
+            setSteamId(data.linkedSteamId);
+            setServerMessage(`Welcome back, ${data.username}!`);
+        } else {
+            setServerMessage(`Welcome ${data.username}! Please link your Steam account.`);
+        }
       } else {
         alert(data.message);
         setServerMessage("");
@@ -67,6 +73,24 @@ function App() {
     setGamesLibrary([]);
     setSelectedAchievements(null);
     setServerMessage("Logged out.");
+  };
+  
+  const handleLinkSteam = async () => {
+      setServerMessage("Linking account...");
+      try {
+          const res = await fetch(`${API_URL}/api/auth/link-steam`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, steamId })
+          });
+          const data = await res.json();
+          alert(data.message);
+          if (res.ok) {
+              setServerMessage("Account linked! You can now sync your games.");
+          }
+      } catch (err) {
+          setServerMessage("Failed to link account.");
+      }
   };
 
   // 4. Steam Dashboard Functions
@@ -169,18 +193,32 @@ function App() {
 
           {/* Control Panel */}
           <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px' }}>
-            <input 
-              type="text" 
-              value={steamId} 
-              onChange={(e) => setSteamId(e.target.value)} 
-              placeholder="Enter SteamID64"
-              style={{ padding: '10px', width: '250px' }}
-            />
-            <div style={{ marginTop: '15px' }}>
-                <button onClick={fetchSteamProfile}>1. Fetch Profile</button>
-                <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
-                <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
-            </div>
+            
+            {/* If they haven't linked an account yet, show the Link button */}
+            {!steamId ? (
+                <div>
+                    <h3>Link Your Steam Account</h3>
+                    <input 
+                        type="text" 
+                        value={steamId} 
+                        onChange={(e) => setSteamId(e.target.value)} 
+                        placeholder="Enter your SteamID64"
+                        style={{ padding: '10px', width: '250px' }}
+                    />
+                    <button onClick={handleLinkSteam} style={{ marginLeft: '10px' }}>Link Account</button>
+                    <p style={{ fontSize: '12px', color: '#888' }}>You only have to do this once!</p>
+                </div>
+            ) : (
+                /* If they HAVE linked an account, show the normal dashboard controls */
+                <div>
+                    <h3>Linked Steam ID: <span style={{ color: '#66c0f4' }}>{steamId}</span></h3>
+                    <div style={{ marginTop: '15px' }}>
+                        <button onClick={fetchSteamProfile}>1. Fetch Profile</button>
+                        <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
+                        <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
+                    </div>
+                </div>
+            )}
           </div>
 
           {/* Profile Display Section */}
