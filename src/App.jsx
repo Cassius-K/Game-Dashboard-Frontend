@@ -111,13 +111,11 @@ function App() {
 
   // 4. Steam & Search Functions
 
-  // Search for players by name or Vanity URL
   const handleSearch = async () => {
     if (!searchQuery) return;
     setServerMessage("Searching for players...");
     setSearchResults([]);
 
-    // If it's exactly 17 digits, treat it as a direct SteamID
     if (/^\d{17}$/.test(searchQuery)) {
         setSteamId(searchQuery);
         setServerMessage("Steam ID detected.");
@@ -135,7 +133,6 @@ function App() {
     }
   };
 
-  // Select a player from the search dropdown
   const selectPlayer = (selectedId) => {
     setSteamId(selectedId);
     setSearchQuery(selectedId);
@@ -180,13 +177,21 @@ function App() {
     if (!steamId) return;
     setServerMessage("Loading games and stats from database...");
     try {
+        // Fetch Games
         const res = await fetch(`${API_URL}/api/games/${steamId}`);
         const data = await res.json();
         setGamesLibrary(data);
 
+        // Fetch Achievement Stats
         const statsRes = await fetch(`${API_URL}/api/stats/${steamId}`);
         const statsData = await statsRes.json();
-        setUserStats(statsData);
+        
+        // Fetch Playtime Stats
+        const playtimeRes = await fetch(`${API_URL}/api/stats/playtime/${steamId}`);
+        const playtimeData = await playtimeRes.json();
+
+        // Combine both sets of data into the stats state
+        setUserStats({ ...statsData, ...playtimeData });
 
         setServerMessage(`Loaded ${data.length} games.`);
     } catch (err) {
@@ -240,20 +245,8 @@ function App() {
         /* --- 1. LOGIN / SIGNUP VIEW --- */
         <div className="card" style={{ padding: '30px', backgroundColor: '#1b2838', borderRadius: '10px', width: '320px', margin: '0 auto' }}>
           <h2>Account Access</h2>
-          <input 
-            type="text" 
-            placeholder="Username" 
-            value={username} 
-            onChange={e => setUsername(e.target.value)} 
-            style={{ display: 'block', margin: '15px auto', padding: '10px', width: '90%' }} 
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            value={password} 
-            onChange={e => setPassword(e.target.value)} 
-            style={{ display: 'block', margin: '15px auto', padding: '10px', width: '90%' }} 
-          />
+          <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} style={{ display: 'block', margin: '15px auto', padding: '10px', width: '90%' }} />
+          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ display: 'block', margin: '15px auto', padding: '10px', width: '90%' }} />
           <div style={{ marginTop: '20px' }}>
             <button onClick={handleLogin} style={{ margin: '5px', padding: '10px 20px' }}>Login</button>
             <button onClick={handleSignup} style={{ margin: '5px', padding: '10px 20px', backgroundColor: '#2a475e' }}>Sign Up</button>
@@ -289,20 +282,7 @@ function App() {
 
                     {/* Search Results Dropdown List */}
                     {searchResults.length > 0 && (
-                        <div style={{ 
-                            backgroundColor: '#171a21', 
-                            border: '1px solid #555', 
-                            borderRadius: '5px', 
-                            width: '310px', 
-                            margin: '5px auto', 
-                            textAlign: 'left', 
-                            position: 'absolute', 
-                            zIndex: 10, 
-                            left: '50%', 
-                            transform: 'translateX(-50%)',
-                            maxHeight: '300px', 
-                            overflowY: 'auto'
-                        }}>
+                        <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
                             {searchResults.map(player => (
                                 <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
@@ -330,6 +310,7 @@ function App() {
 
           {/* Profile Card and Statistics View */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+              {/* Profile Card */}
               {profile && (
                 <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
                   <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
@@ -339,12 +320,13 @@ function App() {
                 </div>
               )}
 
+              {/* Stats Hub Card (Updated with Playtime) */}
               {userStats && (
                 <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
                     <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
                     <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
                     <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '15px' }}>
                         <div>
                             <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
                             <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Unlocked</p>
@@ -353,6 +335,11 @@ function App() {
                             <h3 style={{ margin: '0', color: '#fff' }}>{userStats.total}</h3>
                             <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
                         </div>
+                    </div>
+                    {/* New: Total Playtime Display */}
+                    <div>
+                        <h3 style={{ margin: '0', color: '#fff' }}>{userStats.totalHours?.toLocaleString()}</h3>
+                        <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Total Hours Played</p>
                     </div>
                 </div>
               )}
