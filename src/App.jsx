@@ -285,11 +285,26 @@ function App() {
 
                     {/* Search Results Dropdown List */}
                     {searchResults.length > 0 && (
-                        <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)' }}>
+                        <div style={{ 
+                            backgroundColor: '#171a21', 
+                            border: '1px solid #555', 
+                            borderRadius: '5px', 
+                            width: '310px', 
+                            margin: '5px auto', 
+                            textAlign: 'left', 
+                            position: 'absolute', 
+                            zIndex: 10, 
+                            left: '50%', 
+                            transform: 'translateX(-50%)',
+                            maxHeight: '300px', /* NEW: Limits height */
+                            overflowY: 'auto'   /* NEW: Adds scrollbar if too many results */
+                        }}>
                             {searchResults.map(player => (
                                 <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <img src={player.avatar} alt="av" style={{ width: '25px' }} />
                                     <span>{player.personaname}</span>
+                                    {/* Optional: Add a small tag if it's a new Steam lookup */}
+                                    {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto' }}>Steam Lookup</span>}
                                 </div>
                             ))}
                         </div>
