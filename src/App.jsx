@@ -271,13 +271,17 @@ function App() {
           {/* Player Search and Command Panel */}
           <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
                 <div>
-                    <h3>Player Search</h3>
+                    <h3 style={{ margin: '0 0 5px 0' }}>Player Tracker & Search</h3>
+                    <p style={{ fontSize: '12px', color: '#888', marginBottom: '15px' }}>
+                        Search for tracked players by name, or enter a <strong>SteamID64</strong> or <strong>Custom URL</strong> to track a new player.
+                    </p>
+                    
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                         <input 
                             type="text" 
                             value={searchQuery} 
                             onChange={(e) => setSearchQuery(e.target.value)} 
-                            placeholder="Search Name or SteamID64"
+                            placeholder="e.g. 76561198... or GabeNewell"
                             style={{ padding: '10px', width: '250px' }}
                         />
                         <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
@@ -296,19 +300,33 @@ function App() {
                             zIndex: 10, 
                             left: '50%', 
                             transform: 'translateX(-50%)',
-                            maxHeight: '300px', /* NEW: Limits height */
-                            overflowY: 'auto'   /* NEW: Adds scrollbar if too many results */
+                            maxHeight: '300px', 
+                            overflowY: 'auto'
                         }}>
                             {searchResults.map(player => (
                                 <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <img src={player.avatar} alt="av" style={{ width: '25px' }} />
+                                    <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
                                     <span>{player.personaname}</span>
-                                    {/* Optional: Add a small tag if it's a new Steam lookup */}
-                                    {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto' }}>Steam Lookup</span>}
+                                    {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto', backgroundColor: '#333', padding: '2px 5px', borderRadius: '3px' }}>New to DB</span>}
                                 </div>
                             ))}
                         </div>
                     )}
+                    
+                    <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                        <p>Active Profile: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
+                        
+                        {/* Control Buttons */}
+                        {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
+                        {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+
+                        <button id="btn-fetch" onClick={fetchSteamProfile}>1. Load Profile</button>
+                        <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
+                        <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
+                        <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
+                    </div>
+                </div>
+          </div>
                     
                     <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
                         <p>Active ID: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
