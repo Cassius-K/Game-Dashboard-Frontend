@@ -7,6 +7,9 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
+  const [gamesLibrary, setGamesLibrary] = useState([]);
+  const [selectedAchievements, setSelectedAchievements] = useState(null);
+  const [activeGameName, setActiveGameName] = useState("");
 
   // 2. API Configuration
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -60,18 +63,26 @@ function App() {
   };
 
   // 6. Fetch specific achievements for a game
-  const loadAchievements = async (appid) => {
-      setServerMessage(`Fetching achievements for Game ID: ${appid}...`);
+	const loadAchievements = async (appid, gameName) => {
+      setServerMessage(`Fetching achievements for ${gameName}...`);
+      setActiveGameName(gameName);
+      setSelectedAchievements(null); // Clear previous achievements
+
       try {
-          const res = await fetch(`${API_URL}/api/steam/achievements/${steamId}/${appid}`);
-          const data = await res.json();
-          alert(`Success: ${data.achievements ? data.achievements.length : 0} achievements synced for this game!`);
+          // 1. Sync from Steam to DB (Your existing backend route)
+          await fetch(`${API_URL}/api/steam/achievements/${steamId}/${appid}`);
+          
+          // 2. Fetch the newly saved achievements FROM your DB
+          const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${appid}`);
+          const dbData = await dbRes.json();
+          
+          setSelectedAchievements(dbData);
           setServerMessage("");
       } catch (err) {
           console.error("Achievement error", err);
           setServerMessage("Failed to fetch achievements.");
       }
-  }
+  };
 
   return (
     <div className="App">
@@ -132,14 +143,45 @@ function App() {
                       <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px' }}>{game.name}</p>
                       <p style={{ fontSize: '12px', color: '#888' }}>App ID: {game.appid}</p>
                       <button 
-                        onClick={() => loadAchievements(game.appid)}
-                        style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}
-                      >
-                        Sync Achievements
-                      </button>
+						onClick={() => loadAchievements(game.appid, game.name)}
+						style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}
+						>
+						View Achievements
+					</button>
                   </div>
               ))}
           </div>
+      )}
+	  {/* NEW: Achievement Display Section */}
+      {selectedAchievements && (
+        <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
+            <h2>🏆 Achievements for {activeGameName}</h2>
+            <p>Total: {selectedAchievements.length} | Unlocked: {selectedAchievements.filter(a => a.achieved === 1).length}</p>
+            
+            {selectedAchievements.length === 0 ? (
+                <p>This game does not have Steam achievements.</p>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px', marginTop: '20px' }}>
+                    {selectedAchievements.map((ach, index) => (
+                        <div key={index} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            backgroundColor: ach.achieved ? '#2a475e' : '#171a21', // Lighter blue if unlocked
+                            padding: '10px', 
+                            borderRadius: '5px',
+                            border: ach.achieved ? '1px solid #66c0f4' : '1px solid #333',
+                            opacity: ach.achieved ? 1 : 0.6 // Dim out locked achievements
+                        }}>
+                            <img src={ach.iconUrl} alt={ach.apiname} style={{ width: '50px', height: '50px', marginRight: '15px', borderRadius: '5px' }} />
+                            <div style={{ textAlign: 'left' }}>
+                                <h4 style={{ margin: '0 0 5px 0', color: ach.achieved ? '#fff' : '#888' }}>{ach.displayName}</h4>
+                                <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>{ach.description}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
       )}
     </div>
   )
