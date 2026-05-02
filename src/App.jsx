@@ -8,6 +8,7 @@ function App() {
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
   const [userStats, setUserStats] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [selectedAchievements, setSelectedAchievements] = useState(null);
   const [activeGameName, setActiveGameName] = useState("");
   
@@ -144,6 +145,18 @@ function App() {
         setServerMessage("Failed to load data from database.");
     }
   };
+  
+  const loadLeaderboard = async () => {
+    setServerMessage("Loading Community Leaderboard...");
+    try {
+        const res = await fetch(`${API_URL}/api/community/leaderboard`);
+        const data = await res.json();
+        setLeaderboard(data);
+        setServerMessage("Leaderboard loaded!");
+    } catch (err) {
+        setServerMessage("Failed to load leaderboard.");
+    }
+  };
 
   const loadAchievements = async (appid, gameName) => {
       setServerMessage(`Fetching achievements for ${gameName}...`);
@@ -224,6 +237,8 @@ function App() {
                         <button onClick={fetchSteamProfile}>1. Fetch Profile</button>
                         <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
                         <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
+						<button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
+						</div>
                     </div>
                 </div>
             )}
@@ -316,6 +331,32 @@ function App() {
           )}
         </div>
       )}
+	  {/* --- NEW: LEADERBOARD SECTION --- */}
+          {leaderboard.length > 0 && (
+            <div className="leaderboard-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px', border: '1px solid #cca43b' }}>
+                <h2 style={{ color: '#cca43b' }}>🌍 Global Leaderboard</h2>
+                <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '20px' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '2px solid #555', color: '#888' }}>
+                            <th style={{ padding: '10px' }}>Rank</th>
+                            <th style={{ padding: '10px' }}>Giga Username</th>
+                            <th style={{ padding: '10px' }}>Total Unlocked Trophies</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {leaderboard.map((user, index) => (
+                            <tr key={user.username} style={{ borderBottom: '1px solid #333', backgroundColor: index === 0 ? '#2a2000' : 'transparent' }}>
+                                <td style={{ padding: '15px 10px', fontSize: index === 0 ? '24px' : '16px' }}>
+                                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                                </td>
+                                <td style={{ padding: '15px 10px', fontWeight: 'bold', color: '#66c0f4' }}>{user.username}</td>
+                                <td style={{ padding: '15px 10px', color: '#fff' }}>{user.unlockedCount}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+          )}
     </div>
   )
 }
