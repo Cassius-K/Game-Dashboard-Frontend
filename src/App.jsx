@@ -356,6 +356,13 @@ function App() {
                             style={{ width: '64px', marginBottom: '10px' }} 
                           />
                           <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px' }}>{game.name}</p>
+                          
+                          {/* --- NEW: Per-Game Playtime Display --- */}
+                          <p style={{ fontSize: '13px', color: '#a3cf06', margin: '5px 0', fontWeight: 'bold' }}>
+                              {/* Convert minutes to hours and show one decimal place */}
+                              {(game.playtime_forever / 60).toFixed(1)} hrs played
+                          </p>
+
                           <p style={{ fontSize: '12px', color: '#888' }}>App ID: {game.appid}</p>
                           <button onClick={() => loadAchievements(game.appid, game.name)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}>
                             View Achievements
