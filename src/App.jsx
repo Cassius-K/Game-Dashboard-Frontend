@@ -3,7 +3,8 @@ import './App.css'
 
 function App() {
   // 1. State Management
-  const [steamId, setSteamId] = useState(''); 
+  const [steamId, setSteamId] = useState(''); // This is the "Active" ID in the search box
+  const [linkedId, setLinkedId] = useState(''); // This is the logged-in user's own linked Steam ID
   const [profile, setProfile] = useState(null);
   const [serverMessage, setServerMessage] = useState("");
   const [gamesLibrary, setGamesLibrary] = useState([]);
@@ -50,11 +51,14 @@ function App() {
       if (data.token) {
         setJwtToken(data.token);
         setIsLoggedIn(true);
+        setUsername(data.username);
+        // If the user already has a linked Steam ID in the DB, load it
         if (data.linkedSteamId) {
-            setSteamId(data.linkedSteamId);
+            setLinkedId(data.linkedSteamId);
+            setSteamId(data.linkedSteamId); // Default the search bar to their own account
             setServerMessage(`Welcome back, ${data.username}!`);
         } else {
-            setServerMessage(`Welcome ${data.username}! Please link your Steam account.`);
+            setServerMessage(`Welcome ${data.username}! Please search and link a Steam account.`);
         }
       } else {
         alert(data.message);
@@ -72,12 +76,16 @@ function App() {
     setPassword("");
     setProfile(null);
     setGamesLibrary([]);
+    setLinkedId("");
+    setSteamId("");
     setSelectedAchievements(null);
     setLeaderboard([]);
     setServerMessage("Logged out.");
   };
   
+  // Links whatever is currently in the search box to the logged-in user's Giga account
   const handleLinkSteam = async () => {
+      if (!steamId) return alert("Please enter a Steam ID to link.");
       setServerMessage("Linking account...");
       try {
           const res = await fetch(`${API_URL}/api/auth/link-steam`, {
@@ -88,7 +96,8 @@ function App() {
           const data = await res.json();
           alert(data.message);
           if (res.ok) {
-              setServerMessage("Account linked! You can now sync your games.");
+              setLinkedId(steamId);
+              setServerMessage("Account linked! This is now your primary Steam ID.");
           }
       } catch (err) {
           setServerMessage("Failed to link account.");
@@ -97,6 +106,7 @@ function App() {
 
   // 4. Steam Dashboard Functions
   const fetchSteamProfile = async () => {
+    if (!steamId) return alert("Please enter a Steam ID.");
     setServerMessage("Fetching profile info...");
     try {
       const res = await fetch(`${API_URL}/api/steam/profile/${steamId}`);
@@ -115,7 +125,8 @@ function App() {
   };
 
   const syncData = async () => {
-    setServerMessage("Syncing with Steam... this may take a moment.");
+    if (!steamId) return;
+    setServerMessage(`Syncing Steam data for ID: ${steamId}...`);
     try {
       const res = await fetch(`${API_URL}/api/steam/sync/${steamId}`, { method: 'POST' });
       const data = await res.json();
@@ -128,6 +139,7 @@ function App() {
   };
 
   const loadLibrary = async () => {
+    if (!steamId) return;
     setServerMessage("Loading games and stats from database...");
     try {
         const res = await fetch(`${API_URL}/api/games/${steamId}`);
@@ -173,6 +185,12 @@ function App() {
       }
   };
 
+  // Helper to jump back to user's own profile
+  const backToMyProfile = () => {
+      setSteamId(linkedId);
+      setServerMessage("Switched back to your profile.");
+  };
+
   return (
     <div className="App">
       <h1>🎮 Giga Game Dashboard</h1>
@@ -205,26 +223,28 @@ function App() {
       ) : (
         /* MAIN DASHBOARD VIEW */
         <div>
-          <button onClick={handleLogout} style={{ float: 'right', backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
-          <div style={{ clear: 'both' }}></div>
+          {/* Top Info Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#171a21', borderRadius: '5px', marginBottom: '10px' }}>
+              <span>User: <strong>{username}</strong> | Linked Steam: <strong>{linkedId || "None"}</strong></span>
+              <button onClick={handleLogout} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
+          </div>
 
           <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px' }}>
-            {!steamId ? (
                 <div>
-                    <h3>Link Your Steam Account</h3>
+                    <h3>Player Search</h3>
                     <input 
                         type="text" 
                         value={steamId} 
                         onChange={(e) => setSteamId(e.target.value)} 
-                        placeholder="Enter your SteamID64"
+                        placeholder="Enter ANY SteamID64"
                         style={{ padding: '10px', width: '250px' }}
                     />
-                    <button onClick={handleLinkSteam} style={{ marginLeft: '10px' }}>Link Account</button>
-                    <p style={{ fontSize: '12px', color: '#888' }}>You only have to do this once!</p>
-                </div>
-            ) : (
-                <div>
-                    <h3>Linked Steam ID: <span style={{ color: '#66c0f4' }}>{steamId}</span></h3>
+                    {/* Only show Link button if they don't have a linked ID yet */}
+                    {!linkedId && <button onClick={handleLinkSteam} style={{ marginLeft: '10px', backgroundColor: '#cca43b', color: 'black' }}>Link to My Account</button>}
+                    
+                    {/* Show Back button if they are looking at someone else */}
+                    {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ marginLeft: '10px' }}>Back to Me</button>}
+
                     <div style={{ marginTop: '15px' }}>
                         <button onClick={fetchSteamProfile}>1. Fetch Profile</button>
                         <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
@@ -232,7 +252,6 @@ function App() {
                         <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
                     </div>
                 </div>
-            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
