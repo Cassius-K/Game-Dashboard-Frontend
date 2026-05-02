@@ -4,6 +4,7 @@ import './App.css'
 function App() {
   const [steamId, setSteamId] = useState('76561198035414121'); // Default test ID
   const [profile, setProfile] = useState(null);
+  const [serverMessage, setServerMessage] = useState("");
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchSteamProfile = async () => {
