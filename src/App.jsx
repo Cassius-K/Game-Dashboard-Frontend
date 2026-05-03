@@ -246,15 +246,29 @@ function App() {
     }
   };
 
-  const loadAchievements = async (appid, gameName) => {
-      setServerMessage(`Fetching achievements for ${gameName}...`);
-      setActiveGameName(gameName);
+  // --- UPDATED: Multi-Platform Achievement Loader ---
+  const loadAchievements = async (game) => {
+      // Determine IDs and platform
+      const gameId = game.appid || game.platformGameId;
+      const platform = game.platform || 'Steam'; 
+      
+      setServerMessage(`Fetching ${platform} achievements for ${game.name}...`);
+      setActiveGameName(game.name);
       setSelectedAchievements(null);
 
       try {
-          await fetch(`${API_URL}/api/steam/achievements/${steamId}/${appid}`);
-          const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${appid}`);
-          const dbData = await dbRes.json();
+          let dbData;
+          if (platform === 'PSN') {
+              // Call the new PlayStation achievement route
+              const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${gameId}`);
+              dbData = await res.json();
+          } else {
+              // Call existing Steam achievement sync and then database fetch
+              await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`);
+              const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${gameId}`);
+              dbData = await dbRes.json();
+          }
+          
           setSelectedAchievements(dbData);
           setServerMessage("");
       } catch (err) {
@@ -343,7 +357,7 @@ function App() {
                 </div>
           </div>
 
-          {/* --- NEW: PlayStation Integration Card --- */}
+          {/* PlayStation Integration Card */}
           <div className="card" style={{ padding: '20px', backgroundColor: '#003087', borderRadius: '10px', marginTop: '10px' }}>
                 <h3 style={{ color: 'white' }}>PlayStation Integration</h3>
                 {!psnAccountId ? (
@@ -401,26 +415,33 @@ function App() {
               )}
           </div>
 
-          {/* Game Library Grid Display */}
+          {/* --- UPDATED: Multi-Platform Game Library Grid --- */}
           {gamesLibrary.length > 0 && (
               <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '30px', justifyContent: 'center' }}>
                   {gamesLibrary.map(game => (
-                      <div key={game.appid} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '220px', backgroundColor: '#171a21', borderRadius: '5px' }}>
+                      <div key={game._id || game.appid} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '220px', backgroundColor: '#171a21', borderRadius: '5px', position: 'relative' }}>
+                          
+                          {/* Platform Badge */}
+                          <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', backgroundColor: game.platform === 'PSN' ? '#003087' : '#1b2838', color: 'white' }}>
+                              {game.platform || 'Steam'}
+                          </span>
+
                           <img 
-                            src={`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} 
+                            src={game.platform === 'PSN' ? game.img_icon_url : `http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`} 
                             alt={game.name} 
-                            style={{ width: '64px', marginBottom: '10px' }} 
+                            style={{ width: '64px', height: '64px', marginBottom: '10px', borderRadius: '5px' }} 
                           />
                           <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px' }}>{game.name}</p>
                           
-                          {/* --- NEW: Per-Game Playtime Display --- */}
-                          <p style={{ fontSize: '13px', color: '#a3cf06', margin: '5px 0', fontWeight: 'bold' }}>
-                              {/* Convert minutes to hours and show one decimal place */}
-                              {(game.playtime_forever / 60).toFixed(1)} hrs played
-                          </p>
+                          {/* Playtime only shown for Steam games */}
+                          {game.platform !== 'PSN' && (
+                              <p style={{ fontSize: '13px', color: '#a3cf06', margin: '5px 0', fontWeight: 'bold' }}>
+                                  {(game.playtime_forever / 60).toFixed(1)} hrs played
+                              </p>
+                          )}
 
-                          <p style={{ fontSize: '12px', color: '#888' }}>App ID: {game.appid}</p>
-                          <button onClick={() => loadAchievements(game.appid, game.name)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}>
+                          <p style={{ fontSize: '12px', color: '#888' }}>ID: {game.appid || game.platformGameId}</p>
+                          <button onClick={() => loadAchievements(game)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}>
                             View Achievements
                           </button>
                       </div>
@@ -434,7 +455,7 @@ function App() {
                 <h2>🏆 Achievements for {activeGameName}</h2>
                 <p>Total: {selectedAchievements.length} | Unlocked: {selectedAchievements.filter(a => a.achieved === 1).length}</p>
                 {selectedAchievements.length === 0 ? (
-                    <p>This game does not have Steam achievements.</p>
+                    <p>This game does not have achievements.</p>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px', marginTop: '20px' }}>
                         {selectedAchievements.map((ach, index) => (
