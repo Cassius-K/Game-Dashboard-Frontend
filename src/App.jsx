@@ -424,11 +424,13 @@ function App() {
               </>
           )}
 
+		{/* PlayStation Integration Card */}
           {activeTab === 'PSN' && (
-              /* --- PLAYSTATION PANEL --- */
               <div className="card" style={{ padding: '20px', backgroundColor: '#003087', borderRadius: '10px', marginTop: '10px' }}>
                     <h3 style={{ color: 'white' }}>PlayStation Integration</h3>
-                    {!psnAccountId ? (
+                    
+                    {/* LOGIC FIX: Check both psnAccountId AND linkedPsnId */}
+                    {!(psnAccountId || linkedPsnId) ? (
                         <div>
                             <p style={{ fontSize: '11px', color: '#ccc' }}>Get your token from: <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: 'white' }}>Sony SSOCookie</a></p>
                             <input 
@@ -442,10 +444,13 @@ function App() {
                         </div>
                     ) : (
                         <div>
-                            <p style={{ color: 'white' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong> (ID: {psnAccountId})</p>
-                            <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white' }}>Sync PSN Games</button>
-                            {/* Use loadLibrary here since it checks activeTab */}
-                            <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>View PSN Library</button> 
+                            <p style={{ color: 'white' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong> (ID: {psnAccountId || linkedPsnId})</p>
+                            
+                            <div style={{ marginTop: '15px' }}>
+                                {/* IMPORTANT: Added the buttons to Sync and Load the library! */}
+                                <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white' }}>1. Sync PSN Games</button>
+                                <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>2. View PSN Library</button>
+                            </div>
                         </div>
                     )}
               </div>
