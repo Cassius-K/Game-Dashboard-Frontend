@@ -3,7 +3,10 @@ import { useState, useEffect } from 'react';
 export default function XboxTab({ username, API_URL, setServerMessage, linkedId, setLinkedId }) {
     const [xboxXuid, setXboxXuid] = useState(linkedId || ''); 
     const [searchQuery, setSearchQuery] = useState(''); 
+    
+    // UI State for Search
     const [searchResults, setSearchResults] = useState([]); 
+    const [wasSearchPerformed, setWasSearchPerformed] = useState(false);
     
     const [profile, setProfile] = useState(null);
     const [gamesLibrary, setGamesLibrary] = useState([]);
@@ -11,50 +14,67 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
     const [activeGameName, setActiveGameName] = useState("");
 
     useEffect(() => {
-        if (linkedId) setXboxXuid(linkedId);
+        if (linkedId) {
+            setXboxXuid(linkedId);
+            // If they have a linked account, we shouldn't necessarily overwrite the search box, 
+            // but we ensure the active XUID is set.
+        }
     }, [linkedId]);
 
     const handleLinkXbox = async () => {
-        if (!searchQuery) return alert("Please type a Gamertag into the search box to link.");
+        if (!xboxXuid) return alert("Please search and select a Gamertag first to link.");
         setServerMessage("Linking Xbox account...");
         try {
             const res = await fetch(`${API_URL}/api/auth/link-xbox`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                // We send the current search query (the name) to the backend
                 body: JSON.stringify({ username, gamertag: searchQuery })
             });
             const data = await res.json();
             if (res.ok) {
                 setLinkedId(data.xuid);
                 setXboxXuid(data.xuid);
+                alert("Account successfully linked!");
+            } else {
+                alert(data.message);
             }
-            alert(data.message);
             setServerMessage("");
         } catch (err) { setServerMessage("Failed to link Xbox account."); }
     };
 
+    // --- FIXED: Advanced Search Logic ---
     const handleSearch = async () => {
         if (!searchQuery) return;
         setServerMessage("Searching Xbox Network...");
         setSearchResults([]);
+        setWasSearchPerformed(true);
+
         try {
             const res = await fetch(`${API_URL}/api/search/xbox/${searchQuery}`);
             const data = await res.json();
-            setSearchResults(data);
-            if (data.length === 0) setServerMessage("No players found.");
-            else setServerMessage(`Found ${data.length} matches.`);
-        } catch (err) { setServerMessage("Search failed."); }
+            
+            if (res.ok) {
+                setSearchResults(data);
+                if (data.length === 0) setServerMessage("No players found.");
+                else setServerMessage(`Found ${data.length} matches. Please select one.`);
+            } else {
+                alert(data.error || "Search failed.");
+                setServerMessage("");
+            }
+        } catch (err) { setServerMessage("Search failed due to network error."); }
     };
 
+    // --- FIXED: Selection Logic ---
     const selectPlayer = (player) => {
-        setXboxXuid(player.xuid);
-        setSearchQuery(player.gamertag); // Use the unified gamertag from our backend
-        setSearchResults([]);
-        setServerMessage("Player selected. Click '1. Load Profile'.");
+        setXboxXuid(player.xuid);          // Set the internal ID for API calls
+        setSearchQuery(player.gamertag);     // Put their name in the search box
+        setSearchResults([]);                // Close the dropdown
+        setServerMessage("Player selected. Click '1. Load Profile' to view their stats.");
     };
 
     const fetchProfile = async () => {
-        if (!xboxXuid) return alert("Please search and select a Gamertag first.");
+        if (!xboxXuid) return alert("Please search and select a player from the list first.");
         setServerMessage("Fetching Xbox profile...");
         try {
             const res = await fetch(`${API_URL}/api/xbox/profile/${xboxXuid}`);
@@ -67,12 +87,12 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
 
     const syncData = async () => {
         if (!xboxXuid) return alert("Please select an account first.");
-        setServerMessage(`Syncing Xbox games...`);
+        setServerMessage(`Syncing Xbox games (This may take a moment)...`);
         try {
             const res = await fetch(`${API_URL}/api/xbox/sync/${xboxXuid}`, { method: 'POST' });
             const data = await res.json();
             alert(data.message || data.error);
-            setServerMessage("");
+            setServerMessage("Sync process finished.");
         } catch (err) { setServerMessage("Sync failed."); }
     };
 
@@ -103,6 +123,12 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         } catch (err) { setServerMessage("Failed to fetch achievements."); }
     };
 
+    const backToMyProfile = () => {
+        setXboxXuid(linkedId);
+        setSearchQuery("My Account"); // Or ideally, store the user's linked gamertag in state and put it here
+        setServerMessage("Switched back to your profile.");
+    };
+
     return (
         <div>
             <div className="card" style={{ padding: '20px', backgroundColor: '#107c10', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
@@ -114,15 +140,21 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
                     <button onClick={handleSearch} style={{ backgroundColor: '#f5f5f5', color: '#107c10' }}>Search</button>
                 </div>
 
+                {/* --- THE DROPDOWN LIST --- */}
                 {searchResults.length > 0 && (
                     <div style={{ backgroundColor: '#0e5c0e', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
                         {searchResults.map(player => (
                             <div key={player.xuid} onClick={() => selectPlayer(player)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}>
-                                {/* FIXED: Correct avatar and gamertag mapping */}
                                 <img src={player.avatar} alt="av" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />
                                 <span style={{ fontWeight: 'bold' }}>{player.gamertag}</span>
                             </div>
                         ))}
+                    </div>
+                )}
+                
+                {wasSearchPerformed && searchResults.length === 0 && (
+                    <div style={{ fontSize: '12px', color: '#ccc', marginTop: '10px', padding: '10px', backgroundColor: '#0e5c0e', borderRadius: '5px' }}>
+                        <p style={{ margin: 0 }}>**No results found.** Try checking spelling or searching for a different player.</p>
                     </div>
                 )}
 
@@ -130,10 +162,10 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
                     <p style={{ color: 'white' }}>Active XUID: <strong style={{ color: '#a3cf06' }}>{xboxXuid || "None"}</strong></p>
                     
                     {!linkedId && xboxXuid && <button onClick={handleLinkXbox} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
-                    {linkedId && xboxXuid !== linkedId && <button onClick={() => { setXboxXuid(linkedId); }} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+                    {linkedId && xboxXuid !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
 
                     <button onClick={fetchProfile} style={{ backgroundColor: '#f5f5f5', color: '#107c10' }}>1. Load Profile</button>
-                    <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
+                    <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px', color: 'white' }}>2. Sync to DB</button>
                     <button onClick={loadLibrary} style={{ backgroundColor: '#cca43b', color: 'black', marginLeft: '10px' }}>3. View Library</button>
                 </div>
             </div>
