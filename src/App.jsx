@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import SteamTab from './components/SteamTab';
 import PlayStationTab from './components/PlayStationTab';
-import XboxTab from './components/XboxTab'; // NEW: Import the Xbox component
+import XboxTab from './components/XboxTab';
+import HomeTab from './components/HomeTab'; // NEW: Import the Home Tab (Mega Dashboard)
 import './App.css';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('Steam'); 
+  // NEW: Set the default active tab to 'Home'
+  const [activeTab, setActiveTab] = useState('Home'); 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -98,12 +100,20 @@ function App() {
 
           {/* --- PLATFORM SWITCHER TABS --- */}
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              {/* NEW: Central Hub Button */}
+              <button onClick={() => setActiveTab('Home')} style={{ backgroundColor: activeTab === 'Home' ? '#cca43b' : '#333', color: activeTab === 'Home' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Central Hub</button>
+              
               <button onClick={() => setActiveTab('Steam')} style={{ backgroundColor: activeTab === 'Steam' ? '#66c0f4' : '#333', color: activeTab === 'Steam' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Steam View</button>
               <button onClick={() => setActiveTab('PSN')} style={{ backgroundColor: activeTab === 'PSN' ? '#003087' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>PlayStation View</button>
               <button onClick={() => setActiveTab('Xbox')} style={{ backgroundColor: activeTab === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>Xbox View</button>
           </div>
 
           {/* --- TAB ROUTING --- */}
+          {/* NEW: Mount the Home Component when active */}
+          {activeTab === 'Home' && (
+              <HomeTab username={username} API_URL={API_URL} linkedSteamId={linkedSteamId} linkedPsnId={linkedPsnId} linkedXboxId={linkedXboxId} />
+          )}
+
           {activeTab === 'Steam' && (
               <SteamTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedSteamId} setLinkedId={setLinkedSteamId} />
           )}
@@ -112,7 +122,6 @@ function App() {
               <PlayStationTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} initialAccountId={linkedPsnId} />
           )}
 
-          {/* NEW: Mount the Xbox Component when active */}
           {activeTab === 'Xbox' && (
               <XboxTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedXboxId} setLinkedId={setLinkedXboxId} />
           )}
