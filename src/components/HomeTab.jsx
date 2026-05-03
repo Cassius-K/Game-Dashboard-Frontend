@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // FIXED: Added useRef back to the import
 
 export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId }) {
     const [megaLibrary, setMegaLibrary] = useState([]);
     const [filter, setFilter] = useState('All');
-    const [sortBy, setSortBy] = useState('Name'); // NEW: Controls sorting logic ('Name' or 'Completion')
+    const [sortBy, setSortBy] = useState('Name');
     
     const [steamSummary, setSteamSummary] = useState(null);
     const [psnSummary, setPsnSummary] = useState(null);
@@ -14,6 +14,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
     const [hydrationStatus, setHydrationStatus] = useState("");
     const isHydrating = useRef(false);
 
+    // Initial load and auto-hydration trigger
     useEffect(() => {
         loadCentralHub();
     }, [linkedSteamId, linkedPsnId, linkedXboxId]);
@@ -140,7 +141,20 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
-                <h2 style={{ color: 'white' }}>Mega Library ({megaLibrary.length} Games)</h2>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
+                    <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
+                    
+                    {/* --- BUTTONS RESTORED --- */}
+                    <button onClick={loadCentralHub} style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }} title="Re-fetch library to see updated completion rates">
+                        🔄 Refresh
+                    </button>
+                    <button onClick={startHydration} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }} title="Scan library for missing completion data">
+                        💧 Hydrate
+                    </button>
+                </div>
+                
+                {/* Hydration Status Bar */}
+                {hydrationStatus && <p style={{ color: '#a3cf06', fontStyle: 'italic' }}>{hydrationStatus}</p>}
                 
                 {/* Filter and Sort Controls */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -153,7 +167,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
                         <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>Xbox</button>
                     </div>
 
-                    {/* NEW: Sort Dropdown */}
+                    {/* Sort Dropdown */}
                     <div>
                         <span style={{ color: '#888', marginRight: '10px' }}>Sort By:</span>
                         <select 
@@ -169,7 +183,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
                 {isLoading ? <p>Loading your empire...</p> : (
                     <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
-                        {/* CHANGED: Now mapping over processedGames instead of filteredGames */}
+                        {/* Now mapping over processedGames */}
                         {processedGames.map(game => (
                             <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '200px', backgroundColor: '#1b2838', borderRadius: '5px', position: 'relative' }}>
                                 
@@ -193,7 +207,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 								/>
                                 <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', margin: '5px 0' }}>{game.name}</p>
                                 
-                                {/* NEW: Display Completion % on the card */}
+                                {/* Display Completion % on the card */}
                                 <p style={{ fontSize: '12px', color: '#cca43b', margin: '5px 0 0 0', fontWeight: 'bold' }}>
                                     Completion: {game.completionRate || 0}%
                                 </p>
