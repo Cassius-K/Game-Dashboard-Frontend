@@ -102,16 +102,43 @@ export default function SteamTab({ username, API_URL, setServerMessage, linkedId
 
     const loadAchievements = async (game) => {
         const gameId = game.appid || game.platformGameId;
-        setServerMessage(`Fetching achievements for ${game.name}...`);
+        
+        if (!gameId) {
+            return alert("Cannot load achievements: Game ID is missing from the database.");
+        }
+
+        setServerMessage(`Fetching Steam achievements for ${game.name}...`);
         setActiveGameName(game.name);
         setSelectedAchievements(null);
+        
         try {
-            await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`);
+            // 1. Tell the backend to ask Steam for the stats
+            const syncRes = await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`);
+            
+            if (!syncRes.ok) {
+                throw new Error(`Server returned ${syncRes.status}`);
+            }
+
+            const syncData = await syncRes.json();
+            
+            // If Steam says the game has no achievements or profile is private
+            if (syncData.error) {
+                 alert(`Steam Error: ${syncData.error}`);
+                 setServerMessage("");
+                 return;
+            }
+
+            // 2. Fetch the newly saved stats from our MongoDB
             const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${gameId}`);
             const dbData = await dbRes.json();
+            
             setSelectedAchievements(dbData);
             setServerMessage("");
-        } catch (err) { setServerMessage("Failed to fetch achievements."); }
+        } catch (err) { 
+            console.error("Achievement error:", err);
+            alert("Failed to load achievements. The game may be private or not support trophies.");
+            setServerMessage("Failed to fetch achievements."); 
+        }
     };
 
     return (

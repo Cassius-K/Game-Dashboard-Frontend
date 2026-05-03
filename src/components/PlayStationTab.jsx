@@ -108,58 +108,52 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         } catch (err) { setServerMessage("Failed to load library."); }
     };
 
-  const loadAchievements = async (game) => {
-      // 1. Strictly determine the ID and Platform
-      // If it's a PSN game, we MUST use platformGameId (the NPWR string)
-      const isPSN = game.platform === 'PSN';
-      const gameId = isPSN ? game.platformGameId : (game.appid || game.platformGameId);
-      const platform = game.platform || 'Steam'; 
-      
-      // Safety Check: If we somehow don't have an ID, stop immediately
-      if (!gameId) {
-          return alert("Cannot load achievements: Game ID is missing from the database.");
-      }
+  // --- UPDATED: Crash-Proof Multi-Platform Achievement Loader (PlayStationTab.jsx) ---
+    const loadAchievements = async (game) => {
+        // Strictly determine the ID
+        const gameId = game.platformGameId;
+        
+        if (!gameId) {
+            return alert("Cannot load achievements: Game ID is missing from the database.");
+        }
 
-      setServerMessage(`Fetching ${platform} achievements for ${game.name}...`);
-      setActiveGameName(game.name);
-      setSelectedAchievements(null);
+        // Determine WHO we are looking at. 
+        // If psnAccountId is "Linked", it means we haven't loaded a real profile yet, so we fall back to "me"
+        const targetId = psnAccountId === "Linked" ? "me" : psnAccountId;
 
-      try {
-          let dbData;
-          if (isPSN) {
-              // Call the PlayStation achievement route
-              // We pass 'username' (the auth owner) and 'gameId' (the NPWR string)
-              const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${gameId}`);
-              
-              // Handle server crashes gracefully
-              if (!res.ok) {
-                  const errorText = await res.text();
-                  console.error("Server returned an error:", errorText);
-                  throw new Error(`Server returned ${res.status}`);
-              }
-              dbData = await res.json();
-              
-              // Handle the specific case where Sony says the game has no trophies
-              if (dbData.error) {
-                  alert(`Sony API Error: ${dbData.error}`);
-                  setServerMessage("");
-                  return;
-              }
-          } else {
-              // Call Steam routes
-              await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`);
-              const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${gameId}`);
-              dbData = await dbRes.json();
-          }
-          
-          setSelectedAchievements(dbData);
-          setServerMessage("");
-      } catch (err) {
-          console.error("Achievement error:", err);
-          alert("Failed to load trophies for this game. It may not support trophies, or the API rejected the request.");
-          setServerMessage("Failed to fetch achievements.");
-      }
-  };
+        setServerMessage(`Fetching PlayStation trophies for ${game.name}...`);
+        setActiveGameName(game.name);
+        setSelectedAchievements(null);
+
+        try {
+            // Call the PlayStation achievement route
+            // UPDATED: We now pass targetId to the URL so the backend looks up the right person!
+            const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${targetId}/${gameId}`);
+            
+            // Handle server crashes gracefully
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error("Server returned an error:", errorText);
+                throw new Error(`Server returned ${res.status}`);
+            }
+            
+            const dbData = await res.json();
+            
+            // Handle the specific case where Sony says the game has no trophies
+            if (dbData.error) {
+                alert(`Sony API Error: ${dbData.error}`);
+                setServerMessage("");
+                return;
+            }
+            
+            setSelectedAchievements(dbData);
+            setServerMessage("");
+        } catch (err) {
+            console.error("Achievement error:", err);
+            alert("Failed to load trophies for this game. It may not support trophies, or the API rejected the request.");
+            setServerMessage("Failed to fetch achievements.");
+        }
+    };
 
     return (
         <div>
