@@ -44,6 +44,7 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             setServerMessage("");
         } catch (err) { setServerMessage("Failed to link PSN."); }
     };
+
     const handlePsnSearch = async () => {
         if (!psnSearchQuery) return;
         setServerMessage("Searching PSN...");
@@ -108,14 +109,17 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         } catch (err) { setServerMessage("Failed to load library."); }
     };
 
-  // --- CRASH FIX: Make sure the URL matches the backend route exactly ---
+  // --- UPDATED: Crash-Proof Multi-Platform Achievement Loader (PlayStationTab.jsx) ---
     const loadAchievements = async (game) => {
+        // Strictly determine the ID
         const gameId = game.platformGameId;
         
         if (!gameId) {
             return alert("Cannot load achievements: Game ID is missing from the database.");
         }
 
+        // Determine WHO we are looking at. 
+        // If psnAccountId is "Linked", it means we haven't loaded a real profile yet, so we fall back to "me"
         const targetId = psnAccountId === "Linked" ? "me" : psnAccountId;
 
         setServerMessage(`Fetching PlayStation trophies for ${game.name}...`);
@@ -123,10 +127,11 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         setSelectedAchievements(null);
 
         try {
-            // FIXED: Ensure we are passing targetId in the URL!
-            // The route is: /api/psn/achievements/:username/:targetAccountId/:npId
+            // Call the PlayStation achievement route
+            // UPDATED: We now pass targetId to the URL so the backend looks up the right person!
             const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${targetId}/${gameId}`);
             
+            // Handle server crashes gracefully
             if (!res.ok) {
                 const errorText = await res.text();
                 console.error("Server returned an error:", errorText);
@@ -135,6 +140,7 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             
             const dbData = await res.json();
             
+            // Handle the specific case where Sony says the game has no trophies
             if (dbData.error) {
                 alert(`Sony API Error: ${dbData.error}`);
                 setServerMessage("");
@@ -148,6 +154,17 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             alert("Failed to load trophies for this game. It may not support trophies, or the API rejected the request.");
             setServerMessage("Failed to fetch achievements.");
         }
+    };
+
+    // --- NEW: Helper function to color-code PlayStation trophies ---
+    const getTrophyColor = (type) => {
+        if (!type) return { bg: '#333', text: '#cca43b' }; // Default Gold/Yellow
+        const t = type.toLowerCase();
+        if (t === 'platinum') return { bg: '#e5e4e2', text: '#333' }; // Platinum/White
+        if (t === 'gold') return { bg: '#ffd700', text: '#333' };     // Gold
+        if (t === 'silver') return { bg: '#c0c0c0', text: '#333' };   // Silver
+        if (t === 'bronze') return { bg: '#cd7f32', text: '#fff' };   // Bronze
+        return { bg: '#333', text: '#cca43b' }; // Fallback
     };
 
     return (
@@ -238,9 +255,19 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                                 <div style={{ textAlign: 'left', color: 'white' }}>
 									<h4 style={{ margin: '0 0 5px 0' }}>
                                         {ach.displayName}
-                                        {/* NEW: Display the Value Badge */}
+                                        {/* NEW: Display the Value Badge with Dynamic Color */}
                                         {ach.value && (
-                                            <span style={{ fontSize: '10px', backgroundColor: '#333', padding: '2px 6px', borderRadius: '4px', marginLeft: '10px', color: '#cca43b', verticalAlign: 'middle' }}>
+                                            <span style={{ 
+                                                fontSize: '10px', 
+                                                padding: '2px 6px', 
+                                                borderRadius: '4px', 
+                                                marginLeft: '10px', 
+                                                backgroundColor: getTrophyColor(ach.value).bg,
+                                                color: getTrophyColor(ach.value).text,
+                                                verticalAlign: 'middle',
+                                                fontWeight: 'bold',
+                                                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                                            }}>
                                                 {ach.value}
                                             </span>
                                         )}
