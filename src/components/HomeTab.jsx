@@ -121,9 +121,6 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
                         💧 Hydrate
                     </button>
                 </div>
-                
-                {/* NEW: Displays the global hydration status message from App.jsx */}
-                {hydrationStatus && <p style={{ color: '#a3cf06', fontStyle: 'italic', height: '20px' }}>{hydrationStatus}</p>}
 
                 {/* Filter and Sort Controls */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>

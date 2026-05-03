@@ -130,9 +130,18 @@ function App() {
     <div className="App">
       <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <h1>🎮 Giga Game Dashboard</h1>
-        {/* NEW: Global Hydration Status Bar */}
-        <p style={{ color: '#a3cf06', fontStyle: 'italic', height: '20px' }}>{hydrationStatus}</p>
-        <p style={{ color: 'lightgreen', fontWeight: 'bold' }}>{serverMessage}</p>
+        {{/* NEW: Global Hydration Status Bar (Styled) */}
+        <p style={{ 
+            color: '#66c0f4', // A nice light blue
+            fontStyle: 'italic', 
+            fontWeight: 'bold',
+            height: '20px', 
+            marginTop: '10px', // Adds space above
+            marginBottom: '10px' // Adds space below
+        }}>
+            {hydrationStatus}
+        </p>
+        <p style={{ color: 'lightblue', fontWeight: 'bold', height: '20px' }}>{serverMessage}</p>
       </header>
 
       {!isLoggedIn ? (
@@ -156,7 +165,6 @@ function App() {
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
               {/* NEW: Central Hub Button */}
               <button onClick={() => setActiveTab('Home')} style={{ backgroundColor: activeTab === 'Home' ? '#cca43b' : '#333', color: activeTab === 'Home' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Central Hub</button>
-              
               <button onClick={() => setActiveTab('Steam')} style={{ backgroundColor: activeTab === 'Steam' ? '#66c0f4' : '#333', color: activeTab === 'Steam' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Steam View</button>
               <button onClick={() => setActiveTab('PSN')} style={{ backgroundColor: activeTab === 'PSN' ? '#003087' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>PlayStation View</button>
               <button onClick={() => setActiveTab('Xbox')} style={{ backgroundColor: activeTab === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>Xbox View</button>
