@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function PlayStationTab({ username, API_URL, setServerMessage, initialAccountId }) {
     const [npsso, setNpsso] = useState('');
+    
+    // NEW: We use this robust flag to determine what UI to show
+    const [isLinked, setIsLinked] = useState(!!initialAccountId); 
+    
     const [psnAccountId, setPsnAccountId] = useState(initialAccountId || '');
     const [activePsnOnlineId, setActivePsnOnlineId] = useState(initialAccountId ? "My Account" : "");
     const [psnSearchQuery, setPsnSearchQuery] = useState('');
@@ -12,6 +16,15 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     const [selectedAchievements, setSelectedAchievements] = useState(null);
     const [activeGameName, setActiveGameName] = useState("");
 
+    // Effect to catch when the user logs in and the app passes down the initialAccountId
+    useEffect(() => {
+        if (initialAccountId) {
+            setIsLinked(true);
+            setPsnAccountId(initialAccountId);
+            setActivePsnOnlineId("My Account");
+        }
+    }, [initialAccountId]);
+
     const handleLinkPsn = async () => {
         setServerMessage("Connecting to Sony...");
         try {
@@ -21,8 +34,15 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                 body: JSON.stringify({ username, npsso })
             });
             const data = await res.json();
+            
             if (res.ok) {
-                setPsnAccountId(data.accountId);
+                // FORCE the UI to switch, regardless of what the accountId variable looks like
+                setIsLinked(true); 
+                if (data.accountId && data.accountId !== "me") {
+                    setPsnAccountId(data.accountId);
+                } else {
+                    setPsnAccountId("Linked"); // Fallback so we know it worked
+                }
                 setActivePsnOnlineId("My Account");
                 alert("PSN Linked successfully!");
             } else {
@@ -51,7 +71,7 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     };
 
     const fetchPsnProfile = async () => {
-        if (!activePsnOnlineId || !psnAccountId) return alert("Please select an ID.");
+        if (!activePsnOnlineId || !isLinked) return alert("Please link PSN or select an ID.");
         setServerMessage("Fetching PSN profile...");
         try {
             const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
@@ -65,9 +85,13 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     };
 
     const syncPsnData = async () => {
+        // If we are looking at "My Account" we just pass the username to the backend, 
+        // the backend will pull our own npsso token and find our AccountID automatically.
+        let targetId = psnAccountId === "Linked" ? "me" : psnAccountId;
+        
         setServerMessage("Syncing PlayStation games...");
         try {
-            const res = await fetch(`${API_URL}/api/psn/sync/${username}`, { method: 'POST' });
+            const res = await fetch(`${API_URL}/api/psn/sync/${username}/${targetId}`, { method: 'POST' });
             const data = await res.json();
             alert(data.message || data.error);
             setServerMessage("");
@@ -76,7 +100,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
 
     const loadLibrary = async () => {
         setServerMessage("Loading PSN Library...");
-        const res = await fetch(`${API_URL}/api/games/${psnAccountId}`);
+        // If we don't have a strict numerical ID yet, ask backend to fetch based on username
+        const fetchId = psnAccountId === "Linked" ? username : psnAccountId; 
+        
+        const res = await fetch(`${API_URL}/api/games/${fetchId}`);
         const data = await res.json();
         setGamesLibrary(data);
         setServerMessage("Library Loaded.");
@@ -96,7 +123,8 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     return (
         <div>
             <div className="card" style={{ padding: '20px', backgroundColor: '#001a4d', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
-                {!psnAccountId ? (
+                {/* LOGIC FIX: Now using 'isLinked' boolean instead of checking the ID string */}
+                {!isLinked ? (
                     <div>
                         <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Account Setup</h3>
                         <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '15px' }}>
