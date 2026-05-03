@@ -130,7 +130,7 @@ function App() {
     <div className="App">
       <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <h1>🎮 Giga Game Dashboard</h1>
-        {{/* NEW: Global Hydration Status Bar (Styled) */}
+        {/* NEW: Global Hydration Status Bar (Styled) */}
         <p style={{ 
             color: '#66c0f4', // A nice light blue
             fontStyle: 'italic', 
