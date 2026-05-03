@@ -112,21 +112,23 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         setServerMessage(`Fetching achievements for ${game.name}...`);
         setActiveGameName(game.name);
         setSelectedAchievements(null);
-        setAchievementError(null); // Clear previous errors
+        setAchievementError(null); 
 
         try {
+            // VERIFY: This URL uses xboxXuid (the person currently in the search/active view)
             const syncRes = await fetch(`${API_URL}/api/xbox/achievements/${xboxXuid}/${game.platformGameId}`);
             const syncData = await syncRes.json();
             
-            // If we hit the Xbox One/Series API restriction, set the error state and stop
             if (syncData.error) {
                 setAchievementError(syncData.details || syncData.error);
                 setServerMessage("");
                 return;
             }
             
+            // VERIFY: This URL also uses xboxXuid to pull from our MongoDB
             const dbRes = await fetch(`${API_URL}/api/achievements/${xboxXuid}/${game.platformGameId}`);
             const dbData = await dbRes.json();
+            
             setSelectedAchievements(dbData);
             setServerMessage("");
         } catch (err) { 
