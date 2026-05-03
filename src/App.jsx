@@ -337,99 +337,103 @@ function App() {
               </button>
           </div>
 
-          {/* --- CONDITIONALLY RENDER PANELS BASED ON TAB --- */}
+
+          {/* ========================================= */}
+          {/*             STEAM TAB VIEW                */}
+          {/* ========================================= */}
           {activeTab === 'Steam' && (
-              <>
-                  {/* Player Search and Command Panel (STEAM) */}
-                  <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
-                        <div>
-                            <h3 style={{ margin: '0 0 5px 0' }}>Player Tracker & Search</h3>
-                            <p style={{ fontSize: '12px', color: '#888', marginBottom: '15px' }}>
-                                Search for tracked players by name, or enter a <strong>SteamID64</strong> or <strong>Custom URL</strong> to track a new player.
-                            </p>
-                            
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                                <input 
-                                    type="text" 
-                                    value={searchQuery} 
-                                    onChange={(e) => setSearchQuery(e.target.value)} 
-                                    placeholder="e.g. 76561198... or GabeNewell"
-                                    style={{ padding: '10px', width: '250px' }}
-                                />
-                                <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
-                            </div>
-
-                            {/* Search Results Dropdown List */}
-                            {searchResults.length > 0 && (
-                                <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
-                                    {searchResults.map(player => (
-                                        <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
-                                            <span>{player.personaname}</span>
-                                            {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto', backgroundColor: '#333', padding: '2px 5px', borderRadius: '3px' }}>New to DB</span>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            
-                            <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
-                                <p>Active Profile: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
-                                
-                                {/* Control Buttons */}
-                                {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
-                                {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
-
-                                <button id="btn-fetch" onClick={fetchSteamProfile}>1. Load Profile</button>
-                                <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
-                                <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
-                                <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
-                            </div>
+            <>
+              {/* Player Search and Command Panel */}
+              <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
+                    <div>
+                        <h3 style={{ margin: '0 0 5px 0' }}>Player Tracker & Search</h3>
+                        <p style={{ fontSize: '12px', color: '#888', marginBottom: '15px' }}>
+                            Search for tracked players by name, or enter a <strong>SteamID64</strong> or <strong>Custom URL</strong> to track a new player.
+                        </p>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                            <input 
+                                type="text" 
+                                value={searchQuery} 
+                                onChange={(e) => setSearchQuery(e.target.value)} 
+                                placeholder="e.g. 76561198... or GabeNewell"
+                                style={{ padding: '10px', width: '250px' }}
+                            />
+                            <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
                         </div>
-                  </div>
 
-                  {/* Profile Card and Statistics View (STEAM) */}
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-                      {profile && (
-                        <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
-                          <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
-                          <h2>{profile.personaname}</h2>
-                          <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
-                          <a href={profile.profileurl} target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>View Steam Profile</a>
-                        </div>
-                      )}
-
-                      {userStats && (
-                        <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
-                            <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
-                            <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
-                            <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
-                            <div style={{ display: 'flex', justifyContent: 'space-around', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '15px' }}>
-                                <div>
-                                    <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
-                                    <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Unlocked</p>
-                                </div>
-                                <div>
-                                    <h3 style={{ margin: '0', color: '#fff' }}>{userStats.total}</h3>
-                                    <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
-                                </div>
+                        {/* Search Results Dropdown List */}
+                        {searchResults.length > 0 && (
+                            <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
+                                {searchResults.map(player => (
+                                    <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
+                                        <span>{player.personaname}</span>
+                                        {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto', backgroundColor: '#333', padding: '2px 5px', borderRadius: '3px' }}>New to DB</span>}
+                                    </div>
+                                ))}
                             </div>
-                            {/* Total Playtime Display */}
+                        )}
+                        
+                        <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                            <p>Active Profile: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
+                            
+                            {/* Control Buttons */}
+                            {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
+                            {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+
+                            <button id="btn-fetch" onClick={fetchSteamProfile}>1. Load Profile</button>
+                            <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
+                            <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
+                            <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
+                        </div>
+                    </div>
+              </div>
+
+              {/* Profile Card and Statistics View */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+                  {profile && (
+                    <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
+                      <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
+                      <h2>{profile.personaname}</h2>
+                      <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
+                      <a href={profile.profileurl} target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>View Steam Profile</a>
+                    </div>
+                  )}
+
+                  {userStats && (
+                    <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
+                        <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
+                        <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
+                        <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-around', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '15px' }}>
                             <div>
-                                <h3 style={{ margin: '0', color: '#fff' }}>{userStats.totalHours?.toLocaleString()}</h3>
-                                <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Total Hours Played</p>
+                                <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
+                                <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Unlocked</p>
+                            </div>
+                            <div>
+                                <h3 style={{ margin: '0', color: '#fff' }}>{userStats.total}</h3>
+                                <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
                             </div>
                         </div>
-                      )}
-                  </div>
-              </>
+                        <div>
+                            <h3 style={{ margin: '0', color: '#fff' }}>{userStats.totalHours?.toLocaleString()}</h3>
+                            <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Total Hours Played</p>
+                        </div>
+                    </div>
+                  )}
+              </div>
+            </>
           )}
 
-		{/* PlayStation Integration Card */}
+
+          {/* ========================================= */}
+          {/*          PLAYSTATION TAB VIEW               */}
+          {/* ========================================= */}
           {activeTab === 'PSN' && (
               <div className="card" style={{ padding: '20px', backgroundColor: '#003087', borderRadius: '10px', marginTop: '10px' }}>
                     <h3 style={{ color: 'white' }}>PlayStation Integration</h3>
                     
-                    {/* LOGIC FIX: Check both psnAccountId AND linkedPsnId */}
                     {!(psnAccountId || linkedPsnId) ? (
                         <div>
                             <p style={{ fontSize: '11px', color: '#ccc' }}>Get your token from: <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: 'white' }}>Sony SSOCookie</a></p>
@@ -447,7 +451,6 @@ function App() {
                             <p style={{ color: 'white' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong> (ID: {psnAccountId || linkedPsnId})</p>
                             
                             <div style={{ marginTop: '15px' }}>
-                                {/* IMPORTANT: Added the buttons to Sync and Load the library! */}
                                 <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white' }}>1. Sync PSN Games</button>
                                 <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>2. View PSN Library</button>
                             </div>
@@ -456,7 +459,10 @@ function App() {
               </div>
           )}
 
-          {/* --- COMMON COMPONENTS (Shows for both tabs) --- */}
+
+          {/* ========================================= */}
+          {/*   COMMON UI (Shows for whatever tab is active)  */}
+          {/* ========================================= */}
 
           {/* Game Library Grid Display */}
           {gamesLibrary.length > 0 && (
