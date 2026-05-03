@@ -2,37 +2,34 @@ import { useState } from 'react'
 import './App.css'
 
 function App() {
-  // ==========================================
-  // 1. STATE MANAGEMENT
-  // ==========================================
-  
-  const [activeTab, setActiveTab] = useState('Steam'); // Controls which platform view is visible ('Steam' or 'PSN')
+  // 1. State Management
+  const [activeTab, setActiveTab] = useState('Steam'); 
   
   // --- Steam Specific State ---
-  const [steamId, setSteamId] = useState(''); // The "Active" Steam ID we are currently looking at
-  const [linkedId, setLinkedId] = useState(''); // The logged-in user's own linked Steam ID
-  const [profile, setProfile] = useState(null); // Stores the Steam profile object (avatar, name)
+  const [steamId, setSteamId] = useState(''); 
+  const [linkedId, setLinkedId] = useState(''); 
+  const [profile, setProfile] = useState(null);
+  const [steamSearchQuery, setSearchQuery] = useState(''); 
+  const [steamSearchResults, setSteamSearchResults] = useState([]); 
+  const [wasSearchPerformed, setWasSearchPerformed] = useState(false);
 
   // --- PlayStation Specific State ---
-  const [npsso, setNpsso] = useState(''); // The raw 64-character token pasted by the user
-  const [psnAccountId, setPsnAccountId] = useState(''); // The raw number ID Sony uses under the hood
-  const [activePsnOnlineId, setActivePsnOnlineId] = useState(''); // The PlayStation username currently being viewed
-  const [linkedPsnId, setLinkedPsnId] = useState(''); // To remember if the user has successfully linked PSN
-  const [psnProfile, setPsnProfile] = useState(null); // Stores PSN profile data
-  const [psnStats, setPsnStats] = useState(null); // Stores PSN Trophy data (Level, Gold/Silver/Bronze counts)
+  const [npsso, setNpsso] = useState('');
+  const [linkedPsnId, setLinkedPsnId] = useState(''); // The logged-in user's personal PSN Account ID
+  const [activePsnAccountId, setActivePsnAccountId] = useState(''); // The ID currently being viewed/synced
+  const [activePsnOnlineId, setActivePsnOnlineId] = useState(''); // The Username currently being viewed (e.g. xX_Sniper_Xx)
+  const [psnProfile, setPsnProfile] = useState(null);
+  const [psnStats, setPsnStats] = useState(null);
+  const [psnSearchQuery, setPsnSearchQuery] = useState('');
+  const [psnSearchResults, setPsnSearchResults] = useState([]);
 
-  // --- Search Convenience States ---
-  const [searchQuery, setSearchQuery] = useState(''); // Text currently typed in the search box
-  const [searchResults, setSearchResults] = useState([]); // List of matching players found in DB or via API
-  const [wasSearchPerformed, setWasSearchPerformed] = useState(false); // Used to show helper text if search fails
-  
   // --- Common Data Display State ---
-  const [serverMessage, setServerMessage] = useState(""); // Top green notification bar text
-  const [gamesLibrary, setGamesLibrary] = useState([]); // Array holding the active user's games
-  const [userStats, setUserStats] = useState(null); // Data Hub Stats (Completion rate, playtime, etc.)
-  const [selectedAchievements, setSelectedAchievements] = useState(null); // The specific trophies for the clicked game
-  const [activeGameName, setActiveGameName] = useState(""); // Title of the game currently being viewed
-  const [leaderboard, setLeaderboard] = useState([]); // Array holding global community rankings
+  const [serverMessage, setServerMessage] = useState("");
+  const [gamesLibrary, setGamesLibrary] = useState([]);
+  const [userStats, setUserStats] = useState(null); 
+  const [selectedAchievements, setSelectedAchievements] = useState(null);
+  const [activeGameName, setActiveGameName] = useState("");
+  const [leaderboard, setLeaderboard] = useState([]);
   
   // --- Auth State ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -40,17 +37,12 @@ function App() {
   const [password, setPassword] = useState("");
   const [jwtToken, setJwtToken] = useState("");
 
-
-  // ==========================================
-  // 2. API CONFIGURATION
-  // ==========================================
+  // 2. API Configuration
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
 
   // ==========================================
   // 3. AUTH & SYSTEM FUNCTIONS
   // ==========================================
-  
   const handleSignup = async () => {
     setServerMessage("Signing up...");
     try {
@@ -62,9 +54,7 @@ function App() {
       const data = await res.json();
       alert(data.message);
       setServerMessage("");
-    } catch (err) {
-      setServerMessage("Signup failed.");
-    }
+    } catch (err) { setServerMessage("Signup failed."); }
   };
 
   const handleLogin = async () => {
@@ -76,45 +66,40 @@ function App() {
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
-      
       if (data.token) {
         setJwtToken(data.token);
         setIsLoggedIn(true);
         setUsername(data.username);
         
-        // Auto-load linked Steam account if it exists in DB
+        // Auto-load linked Steam account
         if (data.linkedSteamId) {
             setLinkedId(data.linkedSteamId);
             setSteamId(data.linkedSteamId); 
-            setSearchQuery(data.linkedSteamId); // Pre-fill search box
+            setSearchQuery(data.linkedSteamId); 
             setServerMessage(`Welcome back, ${data.username}!`);
         } else {
-            setServerMessage(`Welcome ${data.username}! Please link your Steam account.`);
+            setServerMessage(`Welcome ${data.username}! Please link your accounts.`);
         }
 
-        // Auto-load linked PSN account if it exists in DB
+        // Auto-load linked PSN account
         if (data.psnAccountId) {
-            setPsnAccountId(data.psnAccountId);
             setLinkedPsnId(data.psnAccountId);
+            setActivePsnAccountId(data.psnAccountId);
+            // Default the online ID view to "My Account" if we don't know the exact string name
+            setActivePsnOnlineId("My Account"); 
         }
       } else {
         alert(data.message);
         setServerMessage("");
       }
-    } catch (err) {
-      setServerMessage("Login failed.");
-    }
+    } catch (err) { setServerMessage("Login failed."); }
   };
 
-  const handleLogout = () => {
-    // A full page reload is the safest way to wipe all state clean
-    window.location.reload();
-  };
+  const handleLogout = () => { window.location.reload(); };
   
   // ==========================================
   // 4. PLATFORM LINKING FUNCTIONS
   // ==========================================
-
   const handleLinkSteam = async () => {
       if (!steamId) return alert("Please enter a Steam ID to link.");
       setServerMessage("Linking account...");
@@ -126,13 +111,8 @@ function App() {
           });
           const data = await res.json();
           alert(data.message);
-          if (res.ok) {
-              setLinkedId(steamId);
-              setServerMessage("Account linked! This is now your primary Steam ID.");
-          }
-      } catch (err) {
-          setServerMessage("Failed to link account.");
-      }
+          if (res.ok) setLinkedId(steamId);
+      } catch (err) { setServerMessage("Failed to link account."); }
   };
   
   const handleLinkPsn = async () => {
@@ -145,57 +125,45 @@ function App() {
         });
         const data = await res.json();
         if (res.ok) {
-            setPsnAccountId(data.accountId);
             setLinkedPsnId(data.accountId);
-            alert("PSN Linked!");
-        } else {
-            alert(data.message);
-        }
+            setActivePsnAccountId(data.accountId);
+            setActivePsnOnlineId("My Account");
+            alert("PSN Linked successfully!");
+        } else { alert(data.message); }
         setServerMessage("");
-    } catch (err) {
-        setServerMessage("Failed to link PSN.");
-    }
+    } catch (err) { setServerMessage("Failed to link PSN."); }
   };
-
 
   // ==========================================
   // 5. STEAM SPECIFIC FUNCTIONS
   // ==========================================
-
-  // Searches our local DB or asks Steam to resolve a custom Vanity URL
-  const handleSearch = async () => {
-    if (!searchQuery) return;
+  const handleSteamSearch = async () => {
+    if (!steamSearchQuery) return;
     setServerMessage("Searching for players...");
-    setSearchResults([]);
+    setSteamSearchResults([]);
     setWasSearchPerformed(true);
 
-    // If it's exactly 17 digits, treat it as a direct SteamID lookup
-    if (/^\d{17}$/.test(searchQuery)) {
-        setSteamId(searchQuery);
+    if (/^\d{17}$/.test(steamSearchQuery)) {
+        setSteamId(steamSearchQuery);
         setServerMessage("Steam ID detected.");
         return;
     }
-
     try {
-        const res = await fetch(`${API_URL}/api/search/players/${searchQuery}`);
+        const res = await fetch(`${API_URL}/api/search/players/${steamSearchQuery}`);
         const data = await res.json();
-        setSearchResults(data);
+        setSteamSearchResults(data);
         if (data.length === 0) setServerMessage("No players found.");
         else setServerMessage(`Found ${data.length} matches.`);
-    } catch (err) {
-        setServerMessage("Search failed.");
-    }
+    } catch (err) { setServerMessage("Search failed."); }
   };
 
-  // Called when a user clicks a player in the search dropdown
-  const selectPlayer = (selectedId) => {
+  const selectSteamPlayer = (selectedId) => {
     setSteamId(selectedId);
     setSearchQuery(selectedId);
-    setSearchResults([]);
+    setSteamSearchResults([]);
     setServerMessage("Player selected. Click 'Load Profile' to continue.");
   };
 
-  // Fetches basic public data (Avatar, Display Name) from Steam
   const fetchSteamProfile = async () => {
     if (!steamId) return alert("Please search or enter a Steam ID first.");
     setServerMessage("Fetching profile info...");
@@ -205,89 +173,103 @@ function App() {
       if (res.ok) {
         setProfile(data);
         setServerMessage("Profile loaded.");
-      } else {
-        alert(data.message || "Profile not found.");
-        setServerMessage("");
-      }
-    } catch (err) {
-      console.error("Error fetching profile", err);
-      setServerMessage("Error connecting to server.");
-    }
+      } else { alert(data.message); setServerMessage(""); }
+    } catch (err) { setServerMessage("Error connecting to server."); }
   };
 
-  // Triggers the backend loop to pull all games from Steam and save to DB
-  const syncData = async () => {
+  const syncSteamData = async () => {
     if (!steamId) return;
     setServerMessage(`Syncing Steam data for ID: ${steamId}...`);
     try {
       const res = await fetch(`${API_URL}/api/steam/sync/${steamId}`, { method: 'POST' });
       const data = await res.json();
-      alert(data.message || data.error || "Sync complete!");
+      alert(data.message || data.error);
       setServerMessage("Sync process finished.");
-    } catch (err) {
-      console.error("Sync error", err);
-      setServerMessage("Sync failed.");
-    }
+    } catch (err) { setServerMessage("Sync failed."); }
   };
 
+  const backToMySteamProfile = () => {
+      setSteamId(linkedId);
+      setSearchQuery(linkedId);
+      setServerMessage("Switched back to your profile.");
+  };
 
   // ==========================================
   // 6. PLAYSTATION SPECIFIC FUNCTIONS
   // ==========================================
-
-  // Triggers the backend to fetch PSN titles using the npsso token
-  const syncPsnData = async () => {
-    if (!psnAccountId) return alert("Please link or select a PSN account first.");
-    setServerMessage("Syncing PlayStation games (this takes a moment)...");
+  const handlePsnSearch = async () => {
+    if (!psnSearchQuery || !linkedPsnId) return alert("You must link a PSN account first to use search.");
+    setServerMessage("Searching PSN Network...");
+    setPsnSearchResults([]);
     try {
-        const res = await fetch(`${API_URL}/api/psn/sync/${username}`, { method: 'POST' });
+        const res = await fetch(`${API_URL}/api/search/psn/${username}/${psnSearchQuery}`);
         const data = await res.json();
-        alert(data.message || data.error);
-        setServerMessage("PSN Sync complete.");
-    } catch (err) {
-        setServerMessage("PSN Sync failed.");
-    }
+        setPsnSearchResults(data);
+        if (data.length === 0) setServerMessage("No players found.");
+        else setServerMessage(`Found ${data.length} matches.`);
+    } catch (err) { setServerMessage("Search failed."); }
   };
 
-  // Fetches Avatar and Trophy Summary (Platinum/Gold counts) from Sony
+  const selectPsnPlayer = (player) => {
+    setActivePsnOnlineId(player.onlineId);
+    setActivePsnAccountId(player.accountId);
+    setPsnSearchQuery(player.onlineId);
+    setPsnSearchResults([]);
+    setServerMessage("Player selected. Click 'Load Profile'.");
+  };
+
   const fetchPsnProfile = async () => {
-    if (!activePsnOnlineId || !psnAccountId) return alert("Please link PSN or select an ID first.");
+    if (!activePsnOnlineId || !activePsnAccountId) return alert("Please search or select a PSN ID first.");
     setServerMessage("Fetching PSN profile...");
     try {
-      // 1. Get avatar and bio
       const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
       const data = await res.json();
       
-      // 2. Get Trophy Level and Counts
       const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${data.accountId}`);
       const statsData = await statsRes.json();
 
       setPsnProfile(data);
       setPsnStats(statsData);
       setServerMessage("PSN Profile loaded.");
-    } catch (err) {
-      setServerMessage("Error fetching PSN profile.");
-    }
+    } catch (err) { setServerMessage("Error fetching PSN profile."); }
+  };
+
+  const syncPsnData = async () => {
+    if (!activePsnAccountId) return alert("Please link or select an account.");
+    setServerMessage("Syncing PlayStation games (this takes a moment)...");
+    try {
+        // Now passing both the auth username AND the target accountId to the backend
+        const res = await fetch(`${API_URL}/api/psn/sync/${username}/${activePsnAccountId}`, { method: 'POST' });
+        const data = await res.json();
+        alert(data.message || data.error);
+        setServerMessage("PSN Sync complete.");
+    } catch (err) { setServerMessage("PSN Sync failed."); }
+  };
+
+  const backToMyPsnProfile = () => {
+      setActivePsnAccountId(linkedPsnId);
+      setActivePsnOnlineId("My Account");
+      setPsnSearchQuery("");
+      setServerMessage("Switched back to your PSN profile.");
   };
 
 
   // ==========================================
-  // 7. COMMON & SOCIAL FUNCTIONS (Used by both)
+  // 7. COMMON DATA & SOCIAL FUNCTIONS
   // ==========================================
-
-  // Loads the grid of games from MongoDB based on which tab is active
   const loadLibrary = async () => {
-    const idToFetch = activeTab === 'Steam' ? steamId : psnAccountId;
-    if (!idToFetch) return alert(`Please link or select a ${activeTab} account first.`);
+    // Determine which ID to fetch based on active tab
+    const idToFetch = activeTab === 'Steam' ? steamId : activePsnAccountId;
+    if (!idToFetch) return alert(`Please select a ${activeTab} account first.`);
 
-    setServerMessage(`Loading ${activeTab} library from database...`);
+    setServerMessage(`Loading ${activeTab} library and stats from database...`);
     try {
         // Fetch Games
         const res = await fetch(`${API_URL}/api/games/${idToFetch}`);
         const data = await res.json();
         setGamesLibrary(data);
 
-        // Fetch specialized stats only if on the Steam tab
+        // Fetch Steam specific stats
         if (activeTab === 'Steam') {
             const statsRes = await fetch(`${API_URL}/api/stats/${idToFetch}`);
             const statsData = await statsRes.json();
@@ -295,19 +277,15 @@ function App() {
             const playtimeRes = await fetch(`${API_URL}/api/stats/playtime/${idToFetch}`);
             const playtimeData = await playtimeRes.json();
 
-            // Combine both datasets into one stats object
             setUserStats({ ...statsData, ...playtimeData });
         } else {
             setUserStats(null); // Clear Steam stats when viewing PSN
         }
 
         setServerMessage(`Loaded ${data.length} games.`);
-    } catch (err) {
-        setServerMessage("Failed to load data from database.");
-    }
+    } catch (err) { setServerMessage("Failed to load data from database."); }
   };
-
-  // Pulls the top users by total unlocked trophies across the platform
+  
   const loadLeaderboard = async () => {
     setServerMessage("Loading Community Leaderboard...");
     try {
@@ -315,30 +293,25 @@ function App() {
         const data = await res.json();
         setLeaderboard(data);
         setServerMessage("Leaderboard loaded!");
-    } catch (err) {
-        setServerMessage("Failed to load leaderboard.");
-    }
+    } catch (err) { setServerMessage("Failed to load leaderboard."); }
   };
 
-  // Determines platform, syncs specific game trophies from external API, then loads from DB
   const loadAchievements = async (game) => {
       const gameId = game.appid || game.platformGameId;
       const platform = game.platform || 'Steam'; 
       
       setServerMessage(`Fetching ${platform} achievements for ${game.name}...`);
       setActiveGameName(game.name);
-      setSelectedAchievements(null); // Clear previous view
+      setSelectedAchievements(null);
 
       try {
           let dbData;
           if (platform === 'PSN') {
-              // Hit PSN Backend Route
               const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${gameId}`);
               dbData = await res.json();
           } else {
-              // Hit Steam Backend Routes
-              await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`); // Tell server to sync
-              const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${gameId}`); // Tell server to send data back
+              await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`);
+              const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${gameId}`);
               dbData = await dbRes.json();
           }
           
@@ -350,22 +323,9 @@ function App() {
       }
   };
 
-  // Helper function to quick-swap the viewed profile back to the logged-in user
-  const backToMyProfile = () => {
-      setSteamId(linkedId);
-      setSearchQuery(linkedId);
-      setServerMessage("Switched back to your profile.");
-  };
-
-  // ==========================================
-  // RENDER (JSX)
-  // ==========================================
-
   return (
     <div className="App">
       <h1>🎮 Giga Game Dashboard</h1>
-      
-      {/* Top Notification Message Bar */}
       <p style={{ color: 'lightgreen', fontWeight: 'bold', height: '20px' }}>{serverMessage}</p>
 
       {!isLoggedIn ? (
@@ -382,13 +342,13 @@ function App() {
       ) : (
         /* --- 2. MAIN DASHBOARD VIEW (LOGGED IN) --- */
         <div>
-          {/* Dashboard Header Bar (Shows logged in user and global logout) */}
+          {/* Dashboard Header Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#171a21', borderRadius: '5px', marginBottom: '10px' }}>
               <span>User: <strong>{username}</strong> | Linked Steam: <strong>{linkedId || "None"}</strong></span>
               <button onClick={handleLogout} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
           </div>
 
-          {/* --- PLATFORM SWITCHER TABS --- */}
+          {/* PLATFORM SWITCHER TABS */}
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
               <button 
                   onClick={() => { setActiveTab('Steam'); setGamesLibrary([]); setSelectedAchievements(null); }} 
@@ -402,36 +362,35 @@ function App() {
               </button>
           </div>
 
+
           {/* ========================================= */}
           {/*             STEAM TAB VIEW                */}
           {/* ========================================= */}
           {activeTab === 'Steam' && (
               <>
-                  {/* Player Search and Command Panel (STEAM) */}
                   <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
                         <div>
-                            <h3 style={{ margin: '0 0 5px 0' }}>Player Tracker & Search</h3>
+                            <h3 style={{ margin: '0 0 5px 0' }}>Steam Player Tracker & Search</h3>
                             <p style={{ fontSize: '12px', color: '#888', marginBottom: '15px' }}>
-                                Search for tracked players by name, or enter an <strong>exact SteamID64</strong> to track a new player.
+                                Search for tracked players by name, or enter a <strong>SteamID64</strong> or <strong>Custom URL</strong> to track a new player.
                             </p>
                             
-                            {/* Search Input Area */}
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                                 <input 
                                     type="text" 
-                                    value={searchQuery} 
+                                    value={steamSearchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)} 
                                     placeholder="e.g. 76561198... or GabeNewell"
                                     style={{ padding: '10px', width: '250px' }}
                                 />
-                                <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
+                                <button onClick={handleSteamSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
                             </div>
 
-                            {/* Floating Search Results Dropdown List */}
-                            {searchResults.length > 0 && (
+                            {/* Search Results Dropdown List */}
+                            {steamSearchResults.length > 0 && (
                                 <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
-                                    {searchResults.map(player => (
-                                        <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {steamSearchResults.map(player => (
+                                        <div key={player.steamId || player.steamid} onClick={() => selectSteamPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
                                             <span>{player.personaname}</span>
                                             {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto', backgroundColor: '#333', padding: '2px 5px', borderRadius: '3px' }}>New to DB</span>}
@@ -440,22 +399,20 @@ function App() {
                                 </div>
                             )}
                             
-                            {/* Helper text for empty search */}
-                            {wasSearchPerformed && searchResults.length === 0 && (
+                            {wasSearchPerformed && steamSearchResults.length === 0 && (
                                 <div style={{ fontSize: '12px', color: '#ccc', marginTop: '10px', padding: '10px', backgroundColor: '#171a21', borderRadius: '5px' }}>
                                     <p style={{ margin: 0 }}>**No results found.** The Steam API doesn't support partial name searches.</p>
                                 </div>
                             )}
 
-                            {/* Steam Control Buttons */}
                             <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
                                 <p>Active Profile: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
                                 
                                 {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
-                                {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+                                {linkedId && steamId !== linkedId && <button onClick={backToMySteamProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
 
-                                <button id="btn-fetch" onClick={fetchSteamProfile}>1. Load Profile</button>
-                                <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
+                                <button onClick={fetchSteamProfile}>1. Load Profile</button>
+                                <button onClick={syncSteamData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
                                 <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
                                 <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
                             </div>
@@ -473,7 +430,6 @@ function App() {
                         </div>
                       )}
 
-                      {/* Steam Data Hub Stats */}
                       {userStats && (
                         <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
                             <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
@@ -489,7 +445,6 @@ function App() {
                                     <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
                                 </div>
                             </div>
-                            {/* Total Playtime Display */}
                             <div>
                                 <h3 style={{ margin: '0', color: '#fff' }}>{userStats.totalHours?.toLocaleString()}</h3>
                                 <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Total Hours Played</p>
@@ -500,44 +455,95 @@ function App() {
               </>
           )}
 
+
           {/* ========================================= */}
           {/*          PLAYSTATION TAB VIEW             */}
           {/* ========================================= */}
           {activeTab === 'PSN' && (
-              <div className="card" style={{ padding: '20px', backgroundColor: '#003087', borderRadius: '10px', marginTop: '10px' }}>
-                    <h3 style={{ color: 'white' }}>PlayStation Integration</h3>
-                    
-                    {/* LOGIC FIX: Check if either a local token is typed OR the DB confirmed linkage */}
-                    {!(psnAccountId || linkedPsnId) ? (
-                        /* PSN Linking Instructions UI */
-                        <div>
-                            <p style={{ fontSize: '11px', color: '#ccc' }}>Get your token from: <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: 'white' }}>Sony SSOCookie</a></p>
-                            <input 
-                                type="text" 
-                                placeholder="Paste npsso token here" 
-                                value={npsso} 
-                                onChange={e => setNpsso(e.target.value)} 
-                                style={{ padding: '10px', width: '250px' }} 
-                            />
-                            <button onClick={handleLinkPsn} style={{ marginLeft: '10px', backgroundColor: '#f5f5f5', color: '#003087' }}>Link PSN</button>
+              <>
+                  <div className="card" style={{ padding: '20px', backgroundColor: '#001a4d', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
+                        
+                        {/* 1. Linking UI (Shows if the user has not pasted a token yet) */}
+                        {!linkedPsnId ? (
+                            <div>
+                                <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Account Setup</h3>
+                                <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '15px' }}>To use PlayStation features, you must provide an active <strong>npsso</strong> token. <br/><a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>Click here to get yours.</a></p>
+                                <input type="text" placeholder="Paste 64-character token here" value={npsso} onChange={e => setNpsso(e.target.value)} style={{ padding: '10px', width: '250px' }} />
+                                <button onClick={handleLinkPsn} style={{ marginLeft: '10px', backgroundColor: '#f5f5f5', color: '#003087' }}>Authenticate with Sony</button>
+                            </div>
+                        ) : (
+                            /* 2. Tracker & Search UI (Shows once linked) */
+                            <div>
+                                <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Tracker & Search</h3>
+                                <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '15px' }}>Search for any PlayStation Network ID.</p>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                                    <input 
+                                        type="text" 
+                                        value={psnSearchQuery} 
+                                        onChange={(e) => setPsnSearchQuery(e.target.value)} 
+                                        placeholder="e.g. xX_Sniper_Xx"
+                                        style={{ padding: '10px', width: '250px' }}
+                                    />
+                                    <button onClick={handlePsnSearch} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>Search PSN</button>
+                                </div>
+
+                                {/* PSN Search Results Dropdown List */}
+                                {psnSearchResults.length > 0 && (
+                                    <div style={{ backgroundColor: '#002266', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
+                                        {psnSearchResults.map(player => (
+                                            <div key={player.accountId} onClick={() => selectPsnPlayer(player)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}>
+                                                <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
+                                                <span>{player.onlineId}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                                    <p style={{ color: 'white' }}>Active PSN Profile: <strong style={{ color: '#66c0f4' }}>{activePsnOnlineId || "None Selected"}</strong></p>
+                                    
+                                    {linkedPsnId && activePsnAccountId !== linkedPsnId && <button onClick={backToMyPsnProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+
+                                    <button onClick={fetchPsnProfile} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load Profile</button>
+                                    <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white', marginLeft: '10px' }}>2. Sync to DB</button>
+                                    <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>3. View Library</button>
+                                    <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', color: 'white', marginLeft: '10px' }}>4. View Leaderboard</button>
+                                </div>
+                            </div>
+                        )}
+                  </div>
+
+                  {/* Profile Card and Trophy View (PSN) */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+                      {psnProfile && (
+                        <div className="profile-card" style={{ padding: '20px', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', backgroundColor: '#001a4d', color: 'white' }}>
+                          <img src={psnProfile.avatar} alt="Avatar" style={{ borderRadius: '50%', width: '100px' }} />
+                          <h2>{psnProfile.onlineId}</h2>
+                          <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#ccc' }}>"{psnProfile.aboutMe}"</p>
                         </div>
-                    ) : (
-                        /* PSN Command Buttons */
-                        <div>
-                            <p style={{ color: 'white' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong> (ID: {psnAccountId || linkedPsnId})</p>
+                      )}
+
+                      {psnStats && (
+                        <div className="stats-card" style={{ padding: '20px', backgroundColor: '#002266', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', textAlign: 'center', color: 'white' }}>
+                            <h2 style={{ margin: '0 0 15px 0', color: '#ccc' }}>Trophy Hub</h2>
+                            <h1 style={{ fontSize: '48px', margin: '0', color: '#f5f5f5' }}>Lv. {psnStats.level}</h1>
+                            <p style={{ margin: '0 0 20px 0', color: '#888' }}>{psnStats.progress}% to next level</p>
                             
-                            <div style={{ marginTop: '15px' }}>
-                                {/* Note: Profile fetching requires an onlineId (username), which we don't have yet just from npsso. For now, we skip fetching generic profile and just sync games. */}
-                                <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white' }}>1. Sync PSN Games</button>
-                                <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>2. View PSN Library</button>
+                            <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                                <div><strong style={{ color: '#b9a3e3' }}>{psnStats.earned.platinum}</strong><br/><small>Platinum</small></div>
+                                <div><strong style={{ color: '#e6c300' }}>{psnStats.earned.gold}</strong><br/><small>Gold</small></div>
+                                <div><strong style={{ color: '#a6a6a6' }}>{psnStats.earned.silver}</strong><br/><small>Silver</small></div>
+                                <div><strong style={{ color: '#cd7f32' }}>{psnStats.earned.bronze}</strong><br/><small>Bronze</small></div>
                             </div>
                         </div>
-                    )}
-              </div>
+                      )}
+                  </div>
+              </>
           )}
 
           {/* ========================================= */}
-          {/* --- COMMON COMPONENTS (Shows for both tabs) --- */}
+          {/*   COMMON UI (Shows for whatever tab is active)  */}
           {/* ========================================= */}
 
           {/* Game Library Grid Display */}
@@ -546,7 +552,6 @@ function App() {
                   {gamesLibrary.map(game => (
                       <div key={game._id || game.appid} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '220px', backgroundColor: '#171a21', borderRadius: '5px', position: 'relative' }}>
                           
-                          {/* Dynamic Platform Badge (Dark Blue for PSN, Dark Grey for Steam) */}
                           <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', backgroundColor: game.platform === 'PSN' ? '#003087' : '#1b2838', color: 'white' }}>
                               {game.platform || 'Steam'}
                           </span>
@@ -558,7 +563,6 @@ function App() {
                           />
                           <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px' }}>{game.name}</p>
                           
-                          {/* Playtime calculation (Only shown for Steam since PSN API doesn't provide playtime here) */}
                           {game.platform !== 'PSN' && (
                               <p style={{ fontSize: '13px', color: '#a3cf06', margin: '5px 0', fontWeight: 'bold' }}>
                                   {(game.playtime_forever / 60).toFixed(1)} hrs played
@@ -574,7 +578,7 @@ function App() {
               </div>
           )}
 
-          {/* Achievements Detail View (Loads beneath the game library grid) */}
+          {/* Achievements Detail View */}
           {selectedAchievements && (
             <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
                 <h2>🏆 Achievements for {activeGameName}</h2>
@@ -587,11 +591,11 @@ function App() {
                             <div key={index} style={{ 
                                 display: 'flex', 
                                 alignItems: 'center', 
-                                backgroundColor: ach.achieved ? '#2a475e' : '#171a21', // Dark blue if unlocked, dark grey if locked
+                                backgroundColor: ach.achieved ? '#2a475e' : '#171a21',
                                 padding: '10px', 
                                 borderRadius: '5px',
                                 border: ach.achieved ? '1px solid #66c0f4' : '1px solid #333',
-                                opacity: ach.achieved ? 1 : 0.6 // Dim the icon slightly if it hasn't been unlocked
+                                opacity: ach.achieved ? 1 : 0.6
                             }}>
                                 <img src={ach.iconUrl} alt={ach.apiname} style={{ width: '50px', height: '50px', marginRight: '15px', borderRadius: '5px' }} />
                                 <div style={{ textAlign: 'left' }}>
@@ -621,7 +625,6 @@ function App() {
                         {leaderboard.map((user, index) => (
                             <tr key={user.username} style={{ borderBottom: '1px solid #333', backgroundColor: index === 0 ? '#2a2000' : 'transparent' }}>
                                 <td style={{ padding: '15px 10px', fontSize: index === 0 ? '24px' : '16px' }}>
-                                    {/* Helper to show cool emoji medals for the top 3 users */}
                                     {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
                                 </td>
                                 <td style={{ padding: '15px 10px', fontWeight: 'bold', color: '#66c0f4' }}>{user.username}</td>
