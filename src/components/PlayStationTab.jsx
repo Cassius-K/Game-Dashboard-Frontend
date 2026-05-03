@@ -22,7 +22,7 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         }
     }, [initialAccountId]);
 
-    const handleLinkPsn = async () => {
+	const handleLinkPsn = async () => {
         setServerMessage("Connecting to Sony...");
         try {
             const res = await fetch(`${API_URL}/api/auth/link-psn`, {
@@ -34,15 +34,16 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             
             if (res.ok) {
                 setIsLinked(true); 
-                const newId = data.accountId && data.accountId !== "me" ? data.accountId : "Linked";
-                setPsnAccountId(newId);
-                setActivePsnOnlineId("My Account");
-                alert("PSN Linked successfully!");
-            } else { alert(data.message); }
+                setPsnAccountId(data.accountId);
+                // We now use the real onlineId returned by the backend
+                setActivePsnOnlineId(data.onlineId || "me"); 
+                alert(`PSN Linked successfully as ${data.onlineId}!`);
+            } else {
+                alert(data.message);
+            }
             setServerMessage("");
         } catch (err) { setServerMessage("Failed to link PSN."); }
     };
-
     const handlePsnSearch = async () => {
         if (!psnSearchQuery) return;
         setServerMessage("Searching PSN...");
@@ -62,14 +63,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         setServerMessage("Player selected. Click '1. Load Profile'.");
     };
 
-    // --- CRASH FIX APPLIED HERE ---
     const fetchPsnProfile = async () => {
-        // Prevent searching for the placeholder "My Account" string
-        if (!activePsnOnlineId || activePsnOnlineId === "My Account") {
-            return alert("To load your PSN stats, please type your exact PlayStation Username into the Search box, click it, and then click Load Profile.");
-        }
-
-        setServerMessage("Fetching PSN profile...");
+        if (!activePsnOnlineId) return alert("Please select an ID.");
+        
+        setServerMessage(`Fetching PSN profile for ${activePsnOnlineId}...`);
         try {
             const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
             const data = await res.json();
