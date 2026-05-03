@@ -1,180 +1,222 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // NEW: Add useEffect and useRef
+import SteamTab from './components/SteamTab';
+import PlayStationTab from './components/PlayStationTab';
+import XboxTab from './components/XboxTab';
+import HomeTab from './components/HomeTab'; // NEW: Import the Home Tab (Mega Dashboard)
+import './App.css';
 
-export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId }) {
-    const [megaLibrary, setMegaLibrary] = useState([]);
-    const [filter, setFilter] = useState('All');
-    const [sortBy, setSortBy] = useState('Name'); // NEW: Controls sorting logic ('Name' or 'Completion')
-    
-    const [steamSummary, setSteamSummary] = useState(null);
-    const [psnSummary, setPsnSummary] = useState(null);
-    const [xboxSummary, setXboxSummary] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+function App() {
+  // NEW: Set the default active tab to 'Home'
+  const [activeTab, setActiveTab] = useState('Home'); 
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [serverMessage, setServerMessage] = useState("");
+  
+  // These pass the user's primary IDs down to the tabs when they log in
+  const [linkedSteamId, setLinkedSteamId] = useState('');
+  const [linkedPsnId, setLinkedPsnId] = useState('');
+  const [linkedXboxId, setLinkedXboxId] = useState(''); // NEW: Track the Xbox ID
+  
+  // NEW: Hydration state lives here, at the top level of the app
+  const [hydrationStatus, setHydrationStatus] = useState("");
+  const isHydrating = useRef(false);
 
-    // We use a function inside useEffect so we can call it again on demand
-    useEffect(() => {
-        loadCentralHub();
-    }, []); // Only run once on initial load
+  const [leaderboard, setLeaderboard] = useState([]);
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-    const loadCentralHub = async () => {
-        setIsLoading(true);
-        try {
-            // 1. Load Mega Library from DB
-            const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
-            const libData = await libRes.json();
-            setMegaLibrary(libData);
+  const handleSignup = async () => {
+    setServerMessage("Signing up...");
+    try {
+      const res = await fetch(`${API_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      alert(data.message);
+      setServerMessage("");
+    } catch (err) { setServerMessage("Signup failed."); }
+  };
 
-            // 2. Fetch Steam Stats if linked
-            if (linkedSteamId) {
-                const steamRes = await fetch(`${API_URL}/api/steam/profile/${linkedSteamId}`);
-                if (steamRes.ok) setSteamSummary(await steamRes.json());
-            }
+  const handleLogin = async () => {
+    setServerMessage("Logging in...");
+    try {
+      const res = await fetch(`${API_URL}/api/auth/signin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      
+      if (data.token) {
+        setIsLoggedIn(true);
+        setUsername(data.username);
+        
+        // Load linked accounts on login so the tabs know who the user is
+        if (data.linkedSteamId) setLinkedSteamId(data.linkedSteamId);
+        if (data.psnAccountId) setLinkedPsnId(data.psnAccountId);
+        if (data.linkedXboxXuid) setLinkedXboxId(data.linkedXboxXuid); // NEW: Load Xbox ID
+        
+        setServerMessage(`Welcome, ${data.username}!`);
+      } else { 
+          alert(data.message); 
+          setServerMessage(""); 
+      }
+    } catch (err) { setServerMessage("Login failed."); }
+  };
 
-            // 3. Fetch PSN Stats if linked
-            if (linkedPsnId) {
-                const psnRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${linkedPsnId}`);
-                if (psnRes.ok) setPsnSummary(await psnRes.json());
-            }
+  const handleLogout = () => window.location.reload();
 
-            // 4. Fetch Xbox Stats if linked
-            if (linkedXboxId) {
-                const xboxRes = await fetch(`${API_URL}/api/xbox/profile/${linkedXboxId}`);
-                if (xboxRes.ok) setXboxSummary(await xboxRes.json());
-            }
-        } catch (err) {
-            console.error("Failed to load Central Hub data");
+  // --- NEW: Hydration Queue Logic (lives in App.jsx so it doesn't stop on tab switch) ---
+  const startHydration = async () => {
+    // If a job is already running, or the user isn't logged in, do nothing.
+    if (isHydrating.current || !username) return;
+
+    setHydrationStatus("Checking for games to hydrate...");
+    try {
+        const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
+        const libData = await libRes.json();
+        
+        // Find games that need their completion % calculated
+        const gamesToHydrate = libData.filter(g => 
+            (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox'
+        );
+        
+        if (gamesToHydrate.length > 0) {
+            isHydrating.current = true;
+            hydrateQueue(gamesToHydrate);
+        } else {
+            setHydrationStatus("All games are up to date!");
+            setTimeout(() => setHydrationStatus(""), 5000); // Clear message after 5 seconds
         }
-        setIsLoading(false);
-    };
-
-    // --- SORTING AND FILTERING LOGIC ---
-    // 1. Filter by platform
-    let processedGames = filter === 'All' ? megaLibrary : megaLibrary.filter(g => g.platform === filter);
-
-    // 2. Sort the filtered games
-    if (sortBy === 'Name') {
-        processedGames.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortBy === 'Completion') {
-        // Sort highest percentage to lowest
-        processedGames.sort((a, b) => (b.completionRate || 0) - (a.completionRate || 0));
+    } catch (err) {
+        console.error("Failed to start hydration:", err);
+        setHydrationStatus("Error starting hydration process.");
     }
+  };
 
-    return (
-        <div>
-            {/* --- TOP STATS BANNER --- */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-                
-                {/* Steam Summary Card */}
-                <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: '#1b2838', border: '1px solid #66c0f4', padding: '20px', borderRadius: '10px' }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#66c0f4' }}>Steam</h3>
-                    {steamSummary ? (
-                        <div>
-                            <img src={steamSummary.avatarfull} alt="Steam" style={{ width: '60px', borderRadius: '50%' }} />
-                            <h2>{steamSummary.personaname}</h2>
-                            <h3 style={{ color: '#cca43b' }}>Level {steamSummary.steamLevel || '?'}</h3>
-                        </div>
-                    ) : <p style={{ color: '#888' }}>Not Linked</p>}
-                </div>
+  const hydrateQueue = async (queue) => {
+    for (let i = 0; i < queue.length; i++) {
+        const game = queue[i];
+        setHydrationStatus(`Hydrating... (${i + 1}/${queue.length}) ${game.name}`);
 
-                {/* PSN Summary Card */}
-                <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: '#002266', border: '1px solid #003087', padding: '20px', borderRadius: '10px' }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: 'white' }}>PlayStation</h3>
-                    {psnSummary && !psnSummary.error ? (
-                        <div>
-                            <h1 style={{ fontSize: '48px', margin: '10px 0', color: '#f5f5f5' }}>Lv. {psnSummary.level}</h1>
-                            <p style={{ color: '#b9a3e3' }}>Platinum: {psnSummary.earned?.platinum || 0}</p>
-                        </div>
-                    ) : <p style={{ color: '#888' }}>Not Linked or Synced</p>}
-                </div>
+        try {
+            await fetch(`${API_URL}/api/hydrate/game-completion`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, game })
+            });
+            // Wait 1.5 seconds between requests to be polite to the APIs
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (err) {
+            console.error(`Failed to hydrate ${game.name}:`, err);
+        }
+    }
+    setHydrationStatus("Hydration complete! Click 'Refresh' on the Home tab to see updated stats.");
+    isHydrating.current = false;
+  };
 
-                {/* Xbox Summary Card */}
-                <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: '#0e5c0e', border: '1px solid #107c10', padding: '20px', borderRadius: '10px' }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: 'white' }}>Xbox</h3>
-                    {xboxSummary && !xboxSummary.error ? (
-                        <div>
-                            <img src={xboxSummary.avatar} alt="Xbox" style={{ width: '60px', borderRadius: '50%' }} />
-                            <h2>{xboxSummary.gamertag}</h2>
-                            <h3 style={{ color: '#cca43b' }}>{xboxSummary.gamerscore} Ⓖ</h3>
-                        </div>
-                    ) : <p style={{ color: '#888' }}>Not Linked</p>}
-                </div>
-            </div>
 
-            {/* --- CONSOLIDATED MEGA LIBRARY --- */}
-            <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
-                {/* === FIXED: The Refresh button now shares a header row with the title === */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
-                    <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
-                    <button 
-                        onClick={loadCentralHub} 
-                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-                        title="Re-fetch library to see updated completion rates"
-                    >
-                        🔄 Refresh
-                    </button>
-                </div>
-                
-                {/* Filter and Sort Controls */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                    {/* Platform Filter Buttons */}
-                    <div>
-                        <span style={{ color: '#888', marginRight: '10px' }}>Filter:</span>
-                        <button onClick={() => setFilter('All')} style={{ backgroundColor: filter === 'All' ? '#cca43b' : '#333', color: filter === 'All' ? 'black' : 'white', padding: '5px 10px' }}>All</button>
-                        <button onClick={() => setFilter('Steam')} style={{ backgroundColor: filter === 'Steam' ? '#66c0f4' : '#333', color: filter === 'Steam' ? 'black' : 'white', padding: '5px 10px', marginLeft: '5px' }}>Steam</button>
-                        <button onClick={() => setFilter('PSN')} style={{ backgroundColor: filter === 'PSN' ? '#003087' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>PlayStation</button>
-                        <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>Xbox</button>
-                    </div>
+  const loadLeaderboard = async () => {
+    setServerMessage("Loading Community Leaderboard...");
+    try {
+        const res = await fetch(`${API_URL}/api/community/leaderboard`);
+        const data = await res.json();
+        setLeaderboard(data);
+        setServerMessage("Leaderboard loaded!");
+    } catch (err) { setServerMessage("Failed to load leaderboard."); }
+  };
 
-                    {/* NEW: Sort Dropdown */}
-                    <div>
-                        <span style={{ color: '#888', marginRight: '10px' }}>Sort By:</span>
-                        <select 
-                            value={sortBy} 
-                            onChange={(e) => setSortBy(e.target.value)}
-                            style={{ padding: '8px', backgroundColor: '#333', color: 'white', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}
-                        >
-                            <option value="Name">Alphabetical (A-Z)</option>
-                            <option value="Completion">Completion % (High-Low)</option>
-                        </select>
-                    </div>
-                </div>
+  return (
+    <div className="App">
+      <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
+        <h1>🎮 Giga Game Dashboard</h1>
+        {/* NEW: Global Hydration Status Bar */}
+        <p style={{ color: '#a3cf06', fontStyle: 'italic', height: '20px' }}>{hydrationStatus}</p>
+        <p style={{ color: 'lightgreen', fontWeight: 'bold' }}>{serverMessage}</p>
+      </header>
 
-                {isLoading ? <p>Loading your empire...</p> : (
-                    <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
-                        {/* CHANGED: Now mapping over processedGames instead of filteredGames */}
-                        {processedGames.map(game => (
-                            <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '200px', backgroundColor: '#1b2838', borderRadius: '5px', position: 'relative' }}>
-                                
-                                <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', color: 'white', backgroundColor: game.platform === 'PSN' ? '#003087' : game.platform === 'Xbox' ? '#107c10' : '#333' }}>
-                                    {game.platform}
-                                </span>
-                                
-                                <img 
-									src={game.platform === 'Steam' ? `https://steamcdn-a.akamaihd.net/steam/apps/${game.platformGameId}/header.jpg` : game.img_icon_url} 
-									alt={game.name} 
-									style={{ 
-										width: '100%', 
-										height: 'auto', 
-										aspectRatio: game.platform === 'Steam' ? '460/215' : '1/1', 
-										objectFit: 'cover',
-										marginBottom: '10px', 
-										borderRadius: '5px' 
-									}} 
-                                    // Fallback for missing Steam header images
-                                    onError={(e) => { if(game.platform === 'Steam') { e.target.onerror = null; e.target.src = `http://media.steampowered.com/steamcommunity/public/images/apps/${game.platformGameId}/${game.img_icon_url}.jpg`; } }}
-								/>
-                                <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', margin: '5px 0' }}>{game.name}</p>
-                                
-                                {/* NEW: Display Completion % on the card */}
-                                <p style={{ fontSize: '12px', color: '#cca43b', margin: '5px 0 0 0', fontWeight: 'bold' }}>
-                                    Completion: {game.completionRate || 0}%
-                                </p>
-                                
-                                {game.platform === 'Steam' && <p style={{ fontSize: '12px', color: '#a3cf06', margin: '0' }}>{(game.playtime_forever / 60).toFixed(1)} hrs</p>}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+      {!isLoggedIn ? (
+        <div className="card" style={{ width: '320px', margin: '0 auto', padding: '30px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
+          <h2>Account Access</h2>
+          <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} style={{ display: 'block', margin: '15px auto', padding: '10px', width: '90%' }} />
+          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ display: 'block', margin: '15px auto', padding: '10px', width: '90%' }} />
+          <div style={{ marginTop: '20px' }}>
+            <button onClick={handleLogin} style={{ margin: '5px', padding: '10px 20px' }}>Login</button>
+            <button onClick={handleSignup} style={{ margin: '5px', padding: '10px 20px', backgroundColor: '#2a475e' }}>Sign Up</button>
+          </div>
         </div>
-    );
+      ) : (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#171a21', borderRadius: '5px', marginBottom: '20px' }}>
+              <span>User: <strong>{username}</strong></span>
+              <button onClick={handleLogout} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
+          </div>
+
+          {/* --- PLATFORM SWITCHER TABS --- */}
+          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              {/* NEW: Global Hydration Button */}
+              <button onClick={startHydration} style={{ backgroundColor: '#cc3333', color: 'white', padding: '10px 20px' }} title="Scans your library for missing achievement data">💧 Start Hydration</button>
+              
+              {/* NEW: Central Hub Button */}
+              <button onClick={() => setActiveTab('Home')} style={{ backgroundColor: activeTab === 'Home' ? '#cca43b' : '#333', color: activeTab === 'Home' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Central Hub</button>
+              
+              <button onClick={() => setActiveTab('Steam')} style={{ backgroundColor: activeTab === 'Steam' ? '#66c0f4' : '#333', color: activeTab === 'Steam' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Steam View</button>
+              <button onClick={() => setActiveTab('PSN')} style={{ backgroundColor: activeTab === 'PSN' ? '#003087' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>PlayStation View</button>
+              <button onClick={() => setActiveTab('Xbox')} style={{ backgroundColor: activeTab === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>Xbox View</button>
+          </div>
+
+          {/* --- TAB ROUTING --- */}
+          {/* NEW: Mount the Home Component when active */}
+          {activeTab === 'Home' && (
+              <HomeTab username={username} API_URL={API_URL} linkedSteamId={linkedSteamId} linkedPsnId={linkedPsnId} linkedXboxId={linkedXboxId} />
+          )}
+
+          {activeTab === 'Steam' && (
+              <SteamTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedSteamId} setLinkedId={setLinkedSteamId} />
+          )}
+
+          {activeTab === 'PSN' && (
+              <PlayStationTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} initialAccountId={linkedPsnId} />
+          )}
+
+          {/* NEW: Mount the Xbox Component when active */}
+          {activeTab === 'Xbox' && (
+              <XboxTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedXboxId} setLinkedId={setLinkedXboxId} />
+          )}
+
+          {/* Global Leaderboard Footer */}
+          <div style={{ textAlign: 'center', marginTop: '60px', borderTop: '2px solid #333', paddingTop: '20px' }}>
+              <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', padding: '10px 20px', fontSize: '16px' }}>Load Global Leaderboard</button>
+              {leaderboard.length > 0 && (
+                <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px', border: '1px solid #cca43b' }}>
+                    <h2 style={{ color: '#cca43b' }}>🌍 Global Leaderboard</h2>
+                    <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '20px' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid #555', color: '#888' }}>
+                                <th style={{ padding: '10px' }}>Rank</th>
+                                <th style={{ padding: '10px' }}>Giga Username</th>
+                                <th style={{ padding: '10px' }}>Unlocked Trophies</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {leaderboard.map((u, index) => (
+                                <tr key={u.username} style={{ borderBottom: '1px solid #333' }}>
+                                    <td style={{ padding: '15px 10px', fontSize: index < 3 ? '24px' : '16px' }}>{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}</td>
+                                    <td style={{ padding: '15px 10px', fontWeight: 'bold', color: '#66c0f4' }}>{u.username}</td>
+                                    <td style={{ padding: '15px 10px', color: '#fff' }}>{u.unlockedCount}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+              )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
+
+export default App;
