@@ -191,6 +191,7 @@ export default function SteamTab({ username, API_URL, setServerMessage, linkedId
                     <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
                         <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
                         <h2>{profile.personaname}</h2>
+						<h3 style={{ color: '#cca43b', margin: '5px 0' }}>Level {profile.steamLevel}</h3>
                         <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
                     </div>
                 )}
