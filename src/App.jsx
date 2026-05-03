@@ -12,6 +12,8 @@ function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [selectedAchievements, setSelectedAchievements] = useState(null);
   const [activeGameName, setActiveGameName] = useState("");
+  const [npsso, setNpsso] = useState('');
+  const [psnAccountId, setPsnAccountId] = useState('');
 
   // Search Convenience States
   const [searchQuery, setSearchQuery] = useState(''); // Text typed in the search box
@@ -108,6 +110,39 @@ function App() {
           setServerMessage("Failed to link account.");
       }
   };
+  
+  const handleLinkPsn = async () => {
+    setServerMessage("Connecting to Sony...");
+    try {
+        const res = await fetch(`${API_URL}/api/auth/link-psn`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, npsso })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            setPsnAccountId(data.accountId);
+            alert("PSN Linked!");
+        } else {
+            alert(data.message);
+        }
+        setServerMessage("");
+    } catch (err) {
+        setServerMessage("Failed to link PSN.");
+    }
+	};
+
+	const syncPsnData = async () => {
+    setServerMessage("Syncing PlayStation games...");
+    try {
+        const res = await fetch(`${API_URL}/api/psn/sync/${username}`, { method: 'POST' });
+        const data = await res.json();
+        alert(data.message);
+        setServerMessage("");
+    } catch (err) {
+        setServerMessage("PSN Sync failed.");
+    }
+	};
 
   // 4. Steam & Search Functions
 
@@ -308,9 +343,31 @@ function App() {
                 </div>
           </div>
 
+          {/* --- NEW: PlayStation Integration Card --- */}
+          <div className="card" style={{ padding: '20px', backgroundColor: '#003087', borderRadius: '10px', marginTop: '10px' }}>
+                <h3 style={{ color: 'white' }}>PlayStation Integration</h3>
+                {!psnAccountId ? (
+                    <div>
+                        <p style={{ fontSize: '11px', color: '#ccc' }}>Get your token from: <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: 'white' }}>Sony SSOCookie</a></p>
+                        <input 
+                            type="text" 
+                            placeholder="Paste npsso token here" 
+                            value={npsso} 
+                            onChange={e => setNpsso(e.target.value)} 
+                            style={{ padding: '10px', width: '250px' }} 
+                        />
+                        <button onClick={handleLinkPsn} style={{ marginLeft: '10px', backgroundColor: '#f5f5f5', color: '#003087' }}>Link PSN</button>
+                    </div>
+                ) : (
+                    <div>
+                        <p style={{ color: 'white' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong> (ID: {psnAccountId})</p>
+                        <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white' }}>Sync PSN Games</button>
+                    </div>
+                )}
+          </div>
+
           {/* Profile Card and Statistics View */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-              {/* Profile Card */}
               {profile && (
                 <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
                   <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
@@ -320,7 +377,6 @@ function App() {
                 </div>
               )}
 
-              {/* Stats Hub Card (Updated with Playtime) */}
               {userStats && (
                 <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
                     <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
