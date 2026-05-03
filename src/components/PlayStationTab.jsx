@@ -4,12 +4,8 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     const [npsso, setNpsso] = useState('');
     const [isLinked, setIsLinked] = useState(!!initialAccountId); 
     
-    // Core IDs
-    const [psnAccountId, setPsnAccountId] = useState(initialAccountId || ''); // The logged in user's ID
-    const [activePsnAccountId, setActivePsnAccountId] = useState(''); // The ID we are CURRENTLY looking at
-    const [activePsnOnlineId, setActivePsnOnlineId] = useState(''); // The Username we are CURRENTLY looking at
-
-    // UI State
+    const [psnAccountId, setPsnAccountId] = useState(initialAccountId || '');
+    const [activePsnOnlineId, setActivePsnOnlineId] = useState(initialAccountId ? "My Account" : "");
     const [psnSearchQuery, setPsnSearchQuery] = useState('');
     const [psnSearchResults, setPsnSearchResults] = useState([]);
     const [psnProfile, setPsnProfile] = useState(null);
@@ -18,13 +14,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     const [selectedAchievements, setSelectedAchievements] = useState(null);
     const [activeGameName, setActiveGameName] = useState("");
 
-    // Effect to catch when the user logs in
     useEffect(() => {
         if (initialAccountId) {
             setIsLinked(true);
             setPsnAccountId(initialAccountId);
-            // Default to viewing yourself
-            setActivePsnAccountId(initialAccountId);
             setActivePsnOnlineId("My Account");
         }
     }, [initialAccountId]);
@@ -43,12 +36,9 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                 setIsLinked(true); 
                 const newId = data.accountId && data.accountId !== "me" ? data.accountId : "Linked";
                 setPsnAccountId(newId);
-                setActivePsnAccountId(newId);
                 setActivePsnOnlineId("My Account");
                 alert("PSN Linked successfully!");
-            } else {
-                alert(data.message);
-            }
+            } else { alert(data.message); }
             setServerMessage("");
         } catch (err) { setServerMessage("Failed to link PSN."); }
     };
@@ -60,53 +50,48 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             const res = await fetch(`${API_URL}/api/search/psn/${username}/${psnSearchQuery}`);
             const data = await res.json();
             setPsnSearchResults(data);
-            if (data.length === 0) setServerMessage("No players found. (Note: You cannot search for yourself).");
+            if (data.length === 0) setServerMessage("No players found.");
             else setServerMessage(`Found ${data.length} matches.`);
         } catch (err) { setServerMessage("Search failed."); }
     };
 
     const selectPsnPlayer = (player) => {
         setActivePsnOnlineId(player.onlineId);
-        setActivePsnAccountId(player.accountId);
+        setPsnAccountId(player.accountId);
         setPsnSearchResults([]);
-        setServerMessage("Player selected. Click 'Load Profile'.");
+        setServerMessage("Player selected. Click '1. Load Profile'.");
     };
 
-    // NEW: Shortcut to bypass search and load the logged-in user
-    const loadMyProfileShortcut = () => {
-        setActivePsnAccountId(psnAccountId);
-        setActivePsnOnlineId("me"); // "me" is a special keyword the PSN API understands for the authenticated user
-        setServerMessage("Switched to your profile. Loading data...");
-        // Use a tiny timeout to ensure state updates before fetching
-        setTimeout(() => fetchPsnProfile("me", psnAccountId), 50); 
-    };
+    // --- CRASH FIX APPLIED HERE ---
+    const fetchPsnProfile = async () => {
+        // Prevent searching for the placeholder "My Account" string
+        if (!activePsnOnlineId || activePsnOnlineId === "My Account") {
+            return alert("To load your PSN stats, please type your exact PlayStation Username into the Search box, click it, and then click Load Profile.");
+        }
 
-    // Updated to accept parameters so the shortcut can pass them directly
-    const fetchPsnProfile = async (targetOnlineId = activePsnOnlineId, targetAccountId = activePsnAccountId) => {
-        if (!targetOnlineId || !targetAccountId) return alert("Please link PSN or select an ID.");
         setServerMessage("Fetching PSN profile...");
         try {
-            const res = await fetch(`${API_URL}/api/psn/profile/${username}/${targetOnlineId}`);
+            const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
             const data = await res.json();
-            const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${targetAccountId}`);
-            const statsData = await statsRes.json();
             
+            if (!res.ok || data.error) {
+                alert(data.message || data.error || "Profile not found.");
+                setServerMessage("");
+                return;
+            }
+
+            const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${data.accountId}`);
+            const statsData = await statsRes.json();
+
             setPsnProfile(data);
             setPsnStats(statsData);
             setServerMessage("PSN Profile loaded.");
-            
-            // If we used the "me" shortcut, let's update the UI to show their real online ID now that we have it
-            if (targetOnlineId === "me" && data.onlineId) {
-                setActivePsnOnlineId(data.onlineId);
-            }
-        } catch (err) { setServerMessage("Error fetching profile."); }
+        } catch (err) { setServerMessage("Error fetching PSN profile."); }
     };
 
     const syncPsnData = async () => {
-        // If we are looking at our own account, we pass "me" to the backend
-        let targetId = activePsnAccountId === psnAccountId ? "me" : activePsnAccountId;
-        
-        setServerMessage("Syncing PlayStation games...");
+        let targetId = psnAccountId === "Linked" ? "me" : psnAccountId;
+        setServerMessage("Syncing PlayStation games (this takes a moment)...");
         try {
             const res = await fetch(`${API_URL}/api/psn/sync/${username}/${targetId}`, { method: 'POST' });
             const data = await res.json();
@@ -117,13 +102,13 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
 
     const loadLibrary = async () => {
         setServerMessage("Loading PSN Library...");
-        // If it's our own account, we might just have the "Linked" string, so we tell the backend to use our username
-        const fetchId = activePsnAccountId === psnAccountId ? username : activePsnAccountId; 
-        
-        const res = await fetch(`${API_URL}/api/games/${fetchId}`);
-        const data = await res.json();
-        setGamesLibrary(data);
-        setServerMessage("Library Loaded.");
+        const fetchId = psnAccountId === "Linked" ? username : psnAccountId; 
+        try {
+            const res = await fetch(`${API_URL}/api/games/${fetchId}`);
+            const data = await res.json();
+            setGamesLibrary(data);
+            setServerMessage("Library Loaded.");
+        } catch (err) { setServerMessage("Failed to load library."); }
     };
 
     const loadAchievements = async (game) => {
@@ -153,18 +138,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                 ) : (
                     <div>
                         <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Tracker & Search</h3>
-                        
-                        {/* --- NEW: Load My Profile Shortcut --- */}
-                        <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #333' }}>
-                            <p style={{ color: 'white', margin: '0 0 10px 0' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong></p>
-                            <button onClick={loadMyProfileShortcut} style={{ backgroundColor: '#cca43b', color: 'black', fontWeight: 'bold' }}>⭐ Load My Profile</button>
-                        </div>
-
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                            <input type="text" value={psnSearchQuery} onChange={(e) => setPsnSearchQuery(e.target.value)} placeholder="Search other players (e.g. xX_Sniper_Xx)" style={{ padding: '10px', width: '280px' }} />
+                            <input type="text" value={psnSearchQuery} onChange={(e) => setPsnSearchQuery(e.target.value)} placeholder="e.g. xX_Sniper_Xx" style={{ padding: '10px', width: '250px' }} />
                             <button onClick={handlePsnSearch} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>Search PSN</button>
                         </div>
-                        
                         {psnSearchResults.length > 0 && (
                             <div style={{ backgroundColor: '#002266', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
                                 {psnSearchResults.map(player => (
@@ -175,10 +152,9 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                                 ))}
                             </div>
                         )}
-
-                        <div style={{ marginTop: '20px', paddingTop: '10px' }}>
+                        <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
                             <p style={{ color: 'white' }}>Active PSN Profile: <strong style={{ color: '#66c0f4' }}>{activePsnOnlineId || "None Selected"}</strong></p>
-                            <button onClick={() => fetchPsnProfile()} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load Profile</button>
+                            <button onClick={fetchPsnProfile} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load Profile</button>
                             <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white', marginLeft: '10px' }}>2. Sync to DB</button>
                             <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>3. View Library</button>
                         </div>
@@ -187,23 +163,24 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-                {psnProfile && (
+                {psnProfile && !psnProfile.error && (
                     <div className="profile-card" style={{ padding: '20px', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', backgroundColor: '#001a4d', color: 'white' }}>
                         <img src={psnProfile.avatar} alt="Avatar" style={{ borderRadius: '50%', width: '100px' }} />
                         <h2>{psnProfile.onlineId}</h2>
                         <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#ccc' }}>"{psnProfile.aboutMe}"</p>
                     </div>
                 )}
-                {psnStats && (
+                {/* --- CRASH FIX APPLIED HERE: Added optional chaining (?.) --- */}
+                {psnStats && !psnStats.error && (
                     <div className="stats-card" style={{ padding: '20px', backgroundColor: '#002266', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', textAlign: 'center', color: 'white' }}>
                         <h2 style={{ margin: '0 0 15px 0', color: '#ccc' }}>Trophy Hub</h2>
                         <h1 style={{ fontSize: '48px', margin: '0', color: '#f5f5f5' }}>Lv. {psnStats.level}</h1>
                         <p style={{ margin: '0 0 20px 0', color: '#888' }}>{psnStats.progress}% to next level</p>
                         <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #333', paddingTop: '15px' }}>
-                            <div><strong style={{ color: '#b9a3e3' }}>{psnStats.earned.platinum}</strong><br/><small>Platinum</small></div>
-                            <div><strong style={{ color: '#e6c300' }}>{psnStats.earned.gold}</strong><br/><small>Gold</small></div>
-                            <div><strong style={{ color: '#a6a6a6' }}>{psnStats.earned.silver}</strong><br/><small>Silver</small></div>
-                            <div><strong style={{ color: '#cd7f32' }}>{psnStats.earned.bronze}</strong><br/><small>Bronze</small></div>
+                            <div><strong style={{ color: '#b9a3e3' }}>{psnStats.earned?.platinum || 0}</strong><br/><small>Platinum</small></div>
+                            <div><strong style={{ color: '#e6c300' }}>{psnStats.earned?.gold || 0}</strong><br/><small>Gold</small></div>
+                            <div><strong style={{ color: '#a6a6a6' }}>{psnStats.earned?.silver || 0}</strong><br/><small>Silver</small></div>
+                            <div><strong style={{ color: '#cd7f32' }}>{psnStats.earned?.bronze || 0}</strong><br/><small>Bronze</small></div>
                         </div>
                     </div>
                 )}
@@ -217,7 +194,7 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                             <img src={game.img_icon_url} alt={game.name} style={{ width: '64px', height: '64px', marginBottom: '10px', borderRadius: '5px' }} />
                             <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px', color: 'white' }}>{game.name}</p>
                             <p style={{ fontSize: '12px', color: '#888' }}>ID: {game.platformGameId}</p>
-                            <button onClick={() => loadAchievements(game)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px', backgroundColor: '#003087', color: 'white' }}>View Trophies</button>
+                            <button onClick={() => loadAchievements(game)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}>View Trophies</button>
                         </div>
                     ))}
                 </div>
@@ -230,8 +207,8 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                         {selectedAchievements.map((ach, index) => (
                             <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: ach.achieved ? '#003087' : '#171a21', padding: '10px', borderRadius: '5px', border: ach.achieved ? '1px solid #66c0f4' : '1px solid #333', opacity: ach.achieved ? 1 : 0.6 }}>
                                 <img src={ach.iconUrl} alt={ach.apiname} style={{ width: '50px', height: '50px', marginRight: '15px', borderRadius: '5px' }} />
-                                <div style={{ textAlign: 'left' }}>
-                                    <h4 style={{ margin: '0 0 5px 0', color: ach.achieved ? '#fff' : '#888' }}>{ach.displayName}</h4>
+                                <div style={{ textAlign: 'left', color: 'white' }}>
+                                    <h4 style={{ margin: '0 0 5px 0' }}>{ach.displayName}</h4>
                                     <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>{ach.description}</p>
                                 </div>
                             </div>
