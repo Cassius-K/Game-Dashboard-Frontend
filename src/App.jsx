@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react'; // NEW: Add useEffect and useRef
 import SteamTab from './components/SteamTab';
 import PlayStationTab from './components/PlayStationTab';
 import XboxTab from './components/XboxTab';
@@ -18,6 +18,10 @@ function App() {
   const [linkedPsnId, setLinkedPsnId] = useState('');
   const [linkedXboxId, setLinkedXboxId] = useState(''); // NEW: Track the Xbox ID
   
+  // NEW: Hydration state lives here, at the top level of the app
+  const [hydrationStatus, setHydrationStatus] = useState("");
+  const isHydrating = useRef(false);
+
   const [leaderboard, setLeaderboard] = useState([]);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -64,6 +68,56 @@ function App() {
 
   const handleLogout = () => window.location.reload();
 
+  // --- NEW: Hydration Queue Logic (lives in App.jsx so it doesn't stop on tab switch) ---
+  const startHydration = async () => {
+    // If a job is already running, or the user isn't logged in, do nothing.
+    if (isHydrating.current || !username) return;
+
+    setHydrationStatus("Checking for games to hydrate...");
+    try {
+        const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
+        const libData = await libRes.json();
+        
+        // Find games that need their completion % calculated
+        const gamesToHydrate = libData.filter(g => 
+            (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox'
+        );
+        
+        if (gamesToHydrate.length > 0) {
+            isHydrating.current = true;
+            hydrateQueue(gamesToHydrate);
+        } else {
+            setHydrationStatus("All games are up to date!");
+            setTimeout(() => setHydrationStatus(""), 5000); // Clear message after 5 seconds
+        }
+    } catch (err) {
+        console.error("Failed to start hydration:", err);
+        setHydrationStatus("Error starting hydration process.");
+    }
+  };
+
+  const hydrateQueue = async (queue) => {
+    for (let i = 0; i < queue.length; i++) {
+        const game = queue[i];
+        setHydrationStatus(`Hydrating... (${i + 1}/${queue.length}) ${game.name}`);
+
+        try {
+            await fetch(`${API_URL}/api/hydrate/game-completion`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, game })
+            });
+            // Wait 1.5 seconds between requests to be polite to the APIs
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (err) {
+            console.error(`Failed to hydrate ${game.name}:`, err);
+        }
+    }
+    setHydrationStatus("Hydration complete! Click 'Refresh' on the Home tab to see updated stats.");
+    isHydrating.current = false;
+  };
+
+
   const loadLeaderboard = async () => {
     setServerMessage("Loading Community Leaderboard...");
     try {
@@ -78,6 +132,8 @@ function App() {
     <div className="App">
       <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <h1>🎮 Giga Game Dashboard</h1>
+        {/* NEW: Global Hydration Status Bar */}
+        <p style={{ color: '#a3cf06', fontStyle: 'italic', height: '20px' }}>{hydrationStatus}</p>
         <p style={{ color: 'lightgreen', fontWeight: 'bold' }}>{serverMessage}</p>
       </header>
 
@@ -100,6 +156,9 @@ function App() {
 
           {/* --- PLATFORM SWITCHER TABS --- */}
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              {/* NEW: Global Hydration Button */}
+              <button onClick={startHydration} style={{ backgroundColor: '#cc3333', color: 'white', padding: '10px 20px' }} title="Scans your library for missing achievement data">💧 Start Hydration</button>
+              
               {/* NEW: Central Hub Button */}
               <button onClick={() => setActiveTab('Home')} style={{ backgroundColor: activeTab === 'Home' ? '#cca43b' : '#333', color: activeTab === 'Home' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Central Hub</button>
               
@@ -122,6 +181,7 @@ function App() {
               <PlayStationTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} initialAccountId={linkedPsnId} />
           )}
 
+          {/* NEW: Mount the Xbox Component when active */}
           {activeTab === 'Xbox' && (
               <XboxTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedXboxId} setLinkedId={setLinkedXboxId} />
           )}

@@ -1,65 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId }) {
     const [megaLibrary, setMegaLibrary] = useState([]);
     const [filter, setFilter] = useState('All');
-    const [sortBy, setSortBy] = useState('Name');
+    const [sortBy, setSortBy] = useState('Name'); // NEW: Controls sorting logic ('Name' or 'Completion')
     
     const [steamSummary, setSteamSummary] = useState(null);
     const [psnSummary, setPsnSummary] = useState(null);
     const [xboxSummary, setXboxSummary] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    
-    // --- NEW: State for Background Hydration ---
-    const [hydrationStatus, setHydrationStatus] = useState("");
-    const isHydrating = useRef(false); // useRef prevents re-renders when this value changes
 
+    // We use a function inside useEffect so we can call it again on demand
     useEffect(() => {
         loadCentralHub();
-    }, [linkedSteamId, linkedPsnId, linkedXboxId]);
-
-    // --- NEW: Background Hydration Logic ---
-    useEffect(() => {
-        // If we're already processing or have no games, stop.
-        if (isHydrating.current || megaLibrary.length === 0) return;
-
-        // Find games that haven't had their completion rate calculated yet.
-        const gamesToHydrate = megaLibrary.filter(g => 
-            (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox'
-        );
-        
-        if (gamesToHydrate.length > 0) {
-            isHydrating.current = true;
-            hydrateQueue(gamesToHydrate);
-        }
-    }, [megaLibrary]); // This effect re-runs whenever the library is loaded/refreshed
-
-    // Processes the queue of games one by one with a delay
-    const hydrateQueue = async (queue) => {
-        for (let i = 0; i < queue.length; i++) {
-            const game = queue[i];
-            setHydrationStatus(`Hydrating... (${i + 1}/${queue.length}) ${game.name}`);
-
-            try {
-                await fetch(`${API_URL}/api/hydrate/game-completion`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, game })
-                });
-
-                // Wait 1.5 seconds between each request to avoid API rate limits
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            } catch (err) {
-                console.error(`Failed to hydrate ${game.name}:`, err);
-            }
-        }
-        setHydrationStatus("Hydration complete! Click Refresh to see updated stats.");
-        isHydrating.current = false;
-    };
+    }, []); // Only run once on initial load
 
     const loadCentralHub = async () => {
         setIsLoading(true);
-        setHydrationStatus(""); // Clear the status message on refresh
         try {
             // 1. Load Mega Library from DB
             const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
@@ -144,6 +101,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
+                {/* === FIXED: The Refresh button now shares a header row with the title === */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
                     <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
                     <button 
@@ -154,11 +112,6 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
                         🔄 Refresh
                     </button>
                 </div>
-                
-                {/* --- NEW: Hydration Status Bar --- */}
-                {hydrationStatus && (
-                    <p style={{ color: '#a3cf06', fontSize: '12px', fontStyle: 'italic' }}>{hydrationStatus}</p>
-                )}
                 
                 {/* Filter and Sort Controls */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -171,7 +124,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
                         <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>Xbox</button>
                     </div>
 
-                    {/* Sort Dropdown */}
+                    {/* NEW: Sort Dropdown */}
                     <div>
                         <span style={{ color: '#888', marginRight: '10px' }}>Sort By:</span>
                         <select 
@@ -187,7 +140,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
                 {isLoading ? <p>Loading your empire...</p> : (
                     <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
-                        {/* Mapping over processedGames */}
+                        {/* CHANGED: Now mapping over processedGames instead of filteredGames */}
                         {processedGames.map(game => (
                             <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '200px', backgroundColor: '#1b2838', borderRadius: '5px', position: 'relative' }}>
                                 
@@ -211,7 +164,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 								/>
                                 <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', margin: '5px 0' }}>{game.name}</p>
                                 
-                                {/* Display Completion % on the card */}
+                                {/* NEW: Display Completion % on the card */}
                                 <p style={{ fontSize: '12px', color: '#cca43b', margin: '5px 0 0 0', fontWeight: 'bold' }}>
                                     Completion: {game.completionRate || 0}%
                                 </p>
