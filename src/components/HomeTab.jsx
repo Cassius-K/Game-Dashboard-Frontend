@@ -101,11 +101,12 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
-                <h2 style={{ color: 'white' }}>Mega Library ({megaLibrary.length} Games)</h2>
-				{/* --- NEW: REFRESH BUTTON --- */}
+                {/* === FIXED: The Refresh button now shares a header row with the title === */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
+                    <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
                     <button 
                         onClick={loadCentralHub} 
-                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px' }}
+                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
                         title="Re-fetch library to see updated completion rates"
                     >
                         🔄 Refresh
