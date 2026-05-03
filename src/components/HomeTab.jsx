@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId }) {
     const [megaLibrary, setMegaLibrary] = useState([]);
     const [filter, setFilter] = useState('All');
+    const [sortBy, setSortBy] = useState('Name'); // NEW: Controls sorting logic ('Name' or 'Completion')
     
     const [steamSummary, setSteamSummary] = useState(null);
     const [psnSummary, setPsnSummary] = useState(null);
@@ -44,7 +45,17 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
         setIsLoading(false);
     };
 
-    const filteredGames = filter === 'All' ? megaLibrary : megaLibrary.filter(g => g.platform === filter);
+    // --- SORTING AND FILTERING LOGIC ---
+    // 1. Filter by platform
+    let processedGames = filter === 'All' ? megaLibrary : megaLibrary.filter(g => g.platform === filter);
+
+    // 2. Sort the filtered games
+    if (sortBy === 'Name') {
+        processedGames.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'Completion') {
+        // Sort highest percentage to lowest
+        processedGames.sort((a, b) => (b.completionRate || 0) - (a.completionRate || 0));
+    }
 
     return (
         <div>
@@ -91,35 +102,63 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
                 <h2 style={{ color: 'white' }}>Mega Library ({megaLibrary.length} Games)</h2>
                 
-                {/* Filter Buttons */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
-                    <button onClick={() => setFilter('All')} style={{ backgroundColor: filter === 'All' ? '#cca43b' : '#333', color: filter === 'All' ? 'black' : 'white' }}>All</button>
-                    <button onClick={() => setFilter('Steam')} style={{ backgroundColor: filter === 'Steam' ? '#66c0f4' : '#333', color: filter === 'Steam' ? 'black' : 'white' }}>Steam</button>
-                    <button onClick={() => setFilter('PSN')} style={{ backgroundColor: filter === 'PSN' ? '#003087' : '#333', color: 'white' }}>PlayStation</button>
-                    <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white' }}>Xbox</button>
+                {/* Filter and Sort Controls */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                    {/* Platform Filter Buttons */}
+                    <div>
+                        <span style={{ color: '#888', marginRight: '10px' }}>Filter:</span>
+                        <button onClick={() => setFilter('All')} style={{ backgroundColor: filter === 'All' ? '#cca43b' : '#333', color: filter === 'All' ? 'black' : 'white', padding: '5px 10px' }}>All</button>
+                        <button onClick={() => setFilter('Steam')} style={{ backgroundColor: filter === 'Steam' ? '#66c0f4' : '#333', color: filter === 'Steam' ? 'black' : 'white', padding: '5px 10px', marginLeft: '5px' }}>Steam</button>
+                        <button onClick={() => setFilter('PSN')} style={{ backgroundColor: filter === 'PSN' ? '#003087' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>PlayStation</button>
+                        <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>Xbox</button>
+                    </div>
+
+                    {/* NEW: Sort Dropdown */}
+                    <div>
+                        <span style={{ color: '#888', marginRight: '10px' }}>Sort By:</span>
+                        <select 
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value)}
+                            style={{ padding: '8px', backgroundColor: '#333', color: 'white', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}
+                        >
+                            <option value="Name">Alphabetical (A-Z)</option>
+                            <option value="Completion">Completion % (High-Low)</option>
+                        </select>
+                    </div>
                 </div>
 
                 {isLoading ? <p>Loading your empire...</p> : (
                     <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
-                        {filteredGames.map(game => (
+                        {/* CHANGED: Now mapping over processedGames instead of filteredGames */}
+                        {processedGames.map(game => (
                             <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '200px', backgroundColor: '#1b2838', borderRadius: '5px', position: 'relative' }}>
+                                
                                 <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', color: 'white', backgroundColor: game.platform === 'PSN' ? '#003087' : game.platform === 'Xbox' ? '#107c10' : '#333' }}>
                                     {game.platform}
                                 </span>
+                                
                                 <img 
 									src={game.platform === 'Steam' ? `https://steamcdn-a.akamaihd.net/steam/apps/${game.platformGameId}/header.jpg` : game.img_icon_url} 
 									alt={game.name} 
 									style={{ 
-										width: '100%', // Make it stretch to fill the card
-										height: 'auto', // Keep the aspect ratio
-										aspectRatio: game.platform === 'Steam' ? '460/215' : '1/1', // Steam is wide, others are square
+										width: '100%', 
+										height: 'auto', 
+										aspectRatio: game.platform === 'Steam' ? '460/215' : '1/1', 
 										objectFit: 'cover',
 										marginBottom: '10px', 
 										borderRadius: '5px' 
 									}} 
+                                    // Fallback for missing Steam header images
+                                    onError={(e) => { if(game.platform === 'Steam') { e.target.onerror = null; e.target.src = `http://media.steampowered.com/steamcommunity/public/images/apps/${game.platformGameId}/${game.img_icon_url}.jpg`; } }}
 								/>
-                                <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>{game.name}</p>
-                                {game.platform === 'Steam' && <p style={{ fontSize: '13px', color: '#a3cf06' }}>{(game.playtime_forever / 60).toFixed(1)} hrs</p>}
+                                <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', margin: '5px 0' }}>{game.name}</p>
+                                
+                                {/* NEW: Display Completion % on the card */}
+                                <p style={{ fontSize: '12px', color: '#cca43b', margin: '5px 0 0 0', fontWeight: 'bold' }}>
+                                    Completion: {game.completionRate || 0}%
+                                </p>
+                                
+                                {game.platform === 'Steam' && <p style={{ fontSize: '12px', color: '#a3cf06', margin: '0' }}>{(game.playtime_forever / 60).toFixed(1)} hrs</p>}
                             </div>
                         ))}
                     </div>
