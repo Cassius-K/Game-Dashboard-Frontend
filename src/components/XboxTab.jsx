@@ -48,7 +48,7 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
 
     const selectPlayer = (player) => {
         setXboxXuid(player.xuid);
-        setSearchQuery(player.gamertag);
+        setSearchQuery(player.gamertag); // Use the unified gamertag from our backend
         setSearchResults([]);
         setServerMessage("Player selected. Click '1. Load Profile'.");
     };
@@ -118,8 +118,9 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
                     <div style={{ backgroundColor: '#0e5c0e', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
                         {searchResults.map(player => (
                             <div key={player.xuid} onClick={() => selectPlayer(player)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}>
-                                <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
-                                <span>{player.gamertag}</span>
+                                {/* FIXED: Correct avatar and gamertag mapping */}
+                                <img src={player.avatar} alt="av" style={{ width: '35px', height: '35px', borderRadius: '50%' }} />
+                                <span style={{ fontWeight: 'bold' }}>{player.gamertag}</span>
                             </div>
                         ))}
                     </div>
