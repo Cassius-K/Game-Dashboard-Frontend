@@ -106,7 +106,18 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
                                 <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', color: 'white', backgroundColor: game.platform === 'PSN' ? '#003087' : game.platform === 'Xbox' ? '#107c10' : '#333' }}>
                                     {game.platform}
                                 </span>
-                                <img src={game.platform === 'Steam' ? `http://media.steampowered.com/steamcommunity/public/images/apps/${game.platformGameId}/${game.img_icon_url}.jpg` : game.img_icon_url} alt={game.name} style={{ width: '64px', height: '64px', marginBottom: '10px', borderRadius: '5px' }} />
+                                <img 
+									src={game.platform === 'Steam' ? `https://steamcdn-a.akamaihd.net/steam/apps/${game.platformGameId}/header.jpg` : game.img_icon_url} 
+									alt={game.name} 
+									style={{ 
+										width: '100%', // Make it stretch to fill the card
+										height: 'auto', // Keep the aspect ratio
+										aspectRatio: game.platform === 'Steam' ? '460/215' : '1/1', // Steam is wide, others are square
+										objectFit: 'cover',
+										marginBottom: '10px', 
+										borderRadius: '5px' 
+									}} 
+								/>
                                 <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>{game.name}</p>
                                 {game.platform === 'Steam' && <p style={{ fontSize: '13px', color: '#a3cf06' }}>{(game.playtime_forever / 60).toFixed(1)} hrs</p>}
                             </div>

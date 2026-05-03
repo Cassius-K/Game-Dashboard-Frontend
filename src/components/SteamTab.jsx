@@ -214,7 +214,20 @@ export default function SteamTab({ username, API_URL, setServerMessage, linkedId
                     {gamesLibrary.map(game => (
                         <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '220px', backgroundColor: '#171a21', borderRadius: '5px', position: 'relative' }}>
                             <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', backgroundColor: '#1b2838', color: 'white' }}>Steam</span>
-                            <img src={`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid || game.platformGameId}/${game.img_icon_url}.jpg`} alt={game.name} style={{ width: '64px', height: '64px', marginBottom: '10px', borderRadius: '5px' }} />
+                            <img 
+								src={`https://steamcdn-a.akamaihd.net/steam/apps/${game.appid || game.platformGameId}/header.jpg`} 
+								alt={game.name} 
+								// If the high-res image fails to load (some very old games don't have one), fallback to the low-res icon
+								onError={(e) => { e.target.onerror = null; e.target.src = `http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid || game.platformGameId}/${game.img_icon_url}.jpg`; }}
+								style={{ 
+									width: '100%', 
+									height: 'auto', 
+									aspectRatio: '460/215', 
+									objectFit: 'cover',
+									marginBottom: '10px', 
+									borderRadius: '5px' 
+								}} 
+							/>
                             <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px' }}>{game.name}</p>
                             <p style={{ fontSize: '13px', color: '#a3cf06', margin: '5px 0', fontWeight: 'bold' }}>{(game.playtime_forever / 60).toFixed(1)} hrs played</p>
                             <button onClick={() => loadAchievements(game)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}>View Achievements</button>
