@@ -108,17 +108,14 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         } catch (err) { setServerMessage("Failed to load library."); }
     };
 
-  // --- UPDATED: Crash-Proof Multi-Platform Achievement Loader (PlayStationTab.jsx) ---
+  // --- CRASH FIX: Make sure the URL matches the backend route exactly ---
     const loadAchievements = async (game) => {
-        // Strictly determine the ID
         const gameId = game.platformGameId;
         
         if (!gameId) {
             return alert("Cannot load achievements: Game ID is missing from the database.");
         }
 
-        // Determine WHO we are looking at. 
-        // If psnAccountId is "Linked", it means we haven't loaded a real profile yet, so we fall back to "me"
         const targetId = psnAccountId === "Linked" ? "me" : psnAccountId;
 
         setServerMessage(`Fetching PlayStation trophies for ${game.name}...`);
@@ -126,11 +123,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
         setSelectedAchievements(null);
 
         try {
-            // Call the PlayStation achievement route
-            // UPDATED: We now pass targetId to the URL so the backend looks up the right person!
+            // FIXED: Ensure we are passing targetId in the URL!
+            // The route is: /api/psn/achievements/:username/:targetAccountId/:npId
             const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${targetId}/${gameId}`);
             
-            // Handle server crashes gracefully
             if (!res.ok) {
                 const errorText = await res.text();
                 console.error("Server returned an error:", errorText);
@@ -139,7 +135,6 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             
             const dbData = await res.json();
             
-            // Handle the specific case where Sony says the game has no trophies
             if (dbData.error) {
                 alert(`Sony API Error: ${dbData.error}`);
                 setServerMessage("");
