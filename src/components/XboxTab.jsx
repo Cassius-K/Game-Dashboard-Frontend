@@ -44,7 +44,7 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         } catch (err) { setServerMessage("Failed to link Xbox account."); }
     };
 
-    // --- Advanced Search Logic ---
+    // --- FIXED: Advanced Search Logic ---
     const handleSearch = async () => {
         if (!searchQuery) return;
         setServerMessage("Searching Xbox Network...");
@@ -66,7 +66,7 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         } catch (err) { setServerMessage("Search failed due to network error."); }
     };
 
-    // --- Selection Logic ---
+    // --- FIXED: Selection Logic ---
     const selectPlayer = (player) => {
         setXboxXuid(player.xuid);          // Set the internal ID for API calls
         setSearchQuery(player.gamertag);     // Put their name in the search box
@@ -112,23 +112,21 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         setServerMessage(`Fetching achievements for ${game.name}...`);
         setActiveGameName(game.name);
         setSelectedAchievements(null);
-        setAchievementError(null); 
+        setAchievementError(null); // Clear previous errors
 
         try {
-            // VERIFY: This URL uses xboxXuid (the person currently in the search/active view)
             const syncRes = await fetch(`${API_URL}/api/xbox/achievements/${xboxXuid}/${game.platformGameId}`);
             const syncData = await syncRes.json();
             
+            // If we hit the Xbox One/Series API restriction, set the error state and stop
             if (syncData.error) {
                 setAchievementError(syncData.details || syncData.error);
                 setServerMessage("");
                 return;
             }
             
-            // VERIFY: This URL also uses xboxXuid to pull from our MongoDB
             const dbRes = await fetch(`${API_URL}/api/achievements/${xboxXuid}/${game.platformGameId}`);
             const dbData = await dbRes.json();
-            
             setSelectedAchievements(dbData);
             setServerMessage("");
         } catch (err) { 
@@ -225,15 +223,23 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
                             <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: ach.achieved ? '#107c10' : '#171a21', padding: '10px', borderRadius: '5px', border: ach.achieved ? '1px solid #107c10' : '1px solid #333', opacity: ach.achieved ? 1 : 0.6 }}>
                                 <img src={ach.iconUrl} alt={ach.apiname} style={{ width: '50px', height: '50px', marginRight: '15px', borderRadius: '5px' }} />
                                 <div style={{ textAlign: 'left', color: 'white' }}>
-									<h4 style={{ margin: '0 0 5px 0' }}>{ach.displayName}</h4>
-									<p style={{ margin: 0, fontSize: '12px', color: '#ccc' }}>{ach.description}</p>
-									{/* NEW: Show the Unlock Date if Achieved */}
-									{ach.achieved === 1 && ach.unlocktime > 0 && (
-										<p style={{ margin: '5px 0 0 0', fontSize: '10px', color: '#a3cf06' }}>
-											Unlocked: {new Date(ach.unlocktime * 1000).toLocaleDateString()}
-										</p>
-									)}
-								</div>
+                                    <h4 style={{ margin: '0 0 5px 0' }}>
+                                        {ach.displayName}
+                                        {/* NEW: Display the Gamerscore / Trophy Value */}
+                                        {ach.value && (
+                                            <span style={{ fontSize: '10px', backgroundColor: '#333', padding: '2px 6px', borderRadius: '4px', marginLeft: '10px', color: '#cca43b', verticalAlign: 'middle' }}>
+                                                {ach.value}
+                                            </span>
+                                        )}
+                                    </h4>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#ccc' }}>{ach.description}</p>
+                                    {/* Show the Unlock Date if Achieved */}
+                                    {ach.achieved === 1 && ach.unlocktime > 0 && (
+                                        <p style={{ margin: '5px 0 0 0', fontSize: '10px', color: '#a3cf06' }}>
+                                            Unlocked: {new Date(ach.unlocktime * 1000).toLocaleDateString()}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
