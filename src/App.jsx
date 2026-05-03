@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import SteamTab from './components/SteamTab';
 import PlayStationTab from './components/PlayStationTab';
+import XboxTab from './components/XboxTab'; // NEW: Import the Xbox component
 import './App.css';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
   // These pass the user's primary IDs down to the tabs when they log in
   const [linkedSteamId, setLinkedSteamId] = useState('');
   const [linkedPsnId, setLinkedPsnId] = useState('');
+  const [linkedXboxId, setLinkedXboxId] = useState(''); // NEW: Track the Xbox ID
   
   const [leaderboard, setLeaderboard] = useState([]);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -40,13 +42,21 @@ function App() {
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
+      
       if (data.token) {
         setIsLoggedIn(true);
         setUsername(data.username);
+        
+        // Load linked accounts on login so the tabs know who the user is
         if (data.linkedSteamId) setLinkedSteamId(data.linkedSteamId);
         if (data.psnAccountId) setLinkedPsnId(data.psnAccountId);
+        if (data.linkedXboxXuid) setLinkedXboxId(data.linkedXboxXuid); // NEW: Load Xbox ID
+        
         setServerMessage(`Welcome, ${data.username}!`);
-      } else { alert(data.message); setServerMessage(""); }
+      } else { 
+          alert(data.message); 
+          setServerMessage(""); 
+      }
     } catch (err) { setServerMessage("Login failed."); }
   };
 
@@ -86,17 +96,26 @@ function App() {
               <button onClick={handleLogout} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
           </div>
 
+          {/* --- PLATFORM SWITCHER TABS --- */}
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
               <button onClick={() => setActiveTab('Steam')} style={{ backgroundColor: activeTab === 'Steam' ? '#66c0f4' : '#333', color: activeTab === 'Steam' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Steam View</button>
               <button onClick={() => setActiveTab('PSN')} style={{ backgroundColor: activeTab === 'PSN' ? '#003087' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>PlayStation View</button>
+              {/* NEW: Xbox Tab Button */}
+              <button onClick={() => setActiveTab('Xbox')} style={{ backgroundColor: activeTab === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>Xbox View</button>
           </div>
 
+          {/* --- TAB ROUTING --- */}
           {activeTab === 'Steam' && (
               <SteamTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedSteamId} setLinkedId={setLinkedSteamId} />
           )}
 
           {activeTab === 'PSN' && (
               <PlayStationTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} initialAccountId={linkedPsnId} />
+          )}
+
+          {/* NEW: Mount the Xbox Component when active */}
+          {activeTab === 'Xbox' && (
+              <XboxTab username={username} API_URL={API_URL} setServerMessage={setServerMessage} linkedId={linkedXboxId} setLinkedId={setLinkedXboxId} />
           )}
 
           {/* Global Leaderboard Footer */}
