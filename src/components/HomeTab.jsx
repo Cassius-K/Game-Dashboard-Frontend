@@ -9,14 +9,53 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
     const [psnSummary, setPsnSummary] = useState(null);
     const [xboxSummary, setXboxSummary] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+	
+	// --- MOVED HYDRATION STATE HERE ---
+    const [hydrationStatus, setHydrationStatus] = useState("");
+    const isHydrating = useRef(false);
 
-    // We use a function inside useEffect so we can call it again on demand
     useEffect(() => {
         loadCentralHub();
-    }, []); // Only run once on initial load
+    }, [linkedSteamId, linkedPsnId, linkedXboxId]);
+
+    // --- MOVED HYDRATION LOGIC HERE ---
+    const startHydration = async () => {
+        if (isHydrating.current || megaLibrary.length === 0) return;
+
+        const gamesToHydrate = megaLibrary.filter(g => 
+            (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox'
+        );
+        
+        if (gamesToHydrate.length > 0) {
+            isHydrating.current = true;
+            hydrateQueue(gamesToHydrate);
+        } else {
+            setHydrationStatus("All games are up to date!");
+            setTimeout(() => setHydrationStatus(""), 5000);
+        }
+    };
+
+    const hydrateQueue = async (queue) => {
+        for (let i = 0; i < queue.length; i++) {
+            const game = queue[i];
+            setHydrationStatus(`Hydrating... (${i + 1}/${queue.length}) ${game.name}`);
+
+            try {
+                await fetch(`${API_URL}/api/hydrate/game-completion`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, game })
+                });
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            } catch (err) { console.error(`Failed to hydrate ${game.name}:`, err); }
+        }
+        setHydrationStatus("Hydration complete! Click 'Refresh' to see updated stats.");
+        isHydrating.current = false;
+    };
 
     const loadCentralHub = async () => {
         setIsLoading(true);
+        setHydrationStatus(""); 
         try {
             // 1. Load Mega Library from DB
             const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
@@ -101,17 +140,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
-                {/* === FIXED: The Refresh button now shares a header row with the title === */}
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
-                    <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
-                    <button 
-                        onClick={loadCentralHub} 
-                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-                        title="Re-fetch library to see updated completion rates"
-                    >
-                        🔄 Refresh
-                    </button>
-                </div>
+                <h2 style={{ color: 'white' }}>Mega Library ({megaLibrary.length} Games)</h2>
                 
                 {/* Filter and Sort Controls */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
