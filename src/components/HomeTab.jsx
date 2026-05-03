@@ -3,75 +3,82 @@ import { useState, useEffect, useRef } from 'react';
 export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId }) {
     const [megaLibrary, setMegaLibrary] = useState([]);
     const [filter, setFilter] = useState('All');
-    const [sortBy, setSortBy] = useState('Name'); 
+    const [sortBy, setSortBy] = useState('Name');
     
     const [steamSummary, setSteamSummary] = useState(null);
     const [psnSummary, setPsnSummary] = useState(null);
     const [xboxSummary, setXboxSummary] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    
+    // --- NEW: State for Background Hydration ---
     const [hydrationStatus, setHydrationStatus] = useState("");
-    const isHydrating = useRef(false); // Prevents multiple hydration jobs at once
+    const isHydrating = useRef(false); // useRef prevents re-renders when this value changes
 
     useEffect(() => {
         loadCentralHub();
     }, [linkedSteamId, linkedPsnId, linkedXboxId]);
 
-    // --- BACKGROUND HYDRATION LOGIC ---
+    // --- NEW: Background Hydration Logic ---
     useEffect(() => {
-        // If we are already hydrating or have no games, do nothing
+        // If we're already processing or have no games, stop.
         if (isHydrating.current || megaLibrary.length === 0) return;
 
-        // Find all games that have 0% completion (need hydrating)
-        const gamesToHydrate = megaLibrary.filter(g => (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox');
+        // Find games that haven't had their completion rate calculated yet.
+        const gamesToHydrate = megaLibrary.filter(g => 
+            (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox'
+        );
         
         if (gamesToHydrate.length > 0) {
             isHydrating.current = true;
             hydrateQueue(gamesToHydrate);
         }
-    }, [megaLibrary]); // This effect runs whenever the megaLibrary changes
+    }, [megaLibrary]); // This effect re-runs whenever the library is loaded/refreshed
 
+    // Processes the queue of games one by one with a delay
     const hydrateQueue = async (queue) => {
         for (let i = 0; i < queue.length; i++) {
             const game = queue[i];
             setHydrationStatus(`Hydrating... (${i + 1}/${queue.length}) ${game.name}`);
 
             try {
-                // Tell the backend to fetch and save this one game
                 await fetch(`${API_URL}/api/hydrate/game-completion`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, game })
                 });
 
-                // Wait 1.5 seconds between requests to avoid API bans
+                // Wait 1.5 seconds between each request to avoid API rate limits
                 await new Promise(resolve => setTimeout(resolve, 1500));
             } catch (err) {
-                console.error(`Failed to hydrate ${game.name}`);
+                console.error(`Failed to hydrate ${game.name}:`, err);
             }
         }
         setHydrationStatus("Hydration complete! Click Refresh to see updated stats.");
         isHydrating.current = false;
     };
 
-
     const loadCentralHub = async () => {
         setIsLoading(true);
-        setHydrationStatus(""); // Clear hydration message on refresh
+        setHydrationStatus(""); // Clear the status message on refresh
         try {
             // 1. Load Mega Library from DB
             const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
             const libData = await libRes.json();
             setMegaLibrary(libData);
 
-            // 2. Fetch platform stats... (existing code here)
+            // 2. Fetch Steam Stats if linked
             if (linkedSteamId) {
                 const steamRes = await fetch(`${API_URL}/api/steam/profile/${linkedSteamId}`);
                 if (steamRes.ok) setSteamSummary(await steamRes.json());
             }
+
+            // 3. Fetch PSN Stats if linked
             if (linkedPsnId) {
                 const psnRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${linkedPsnId}`);
                 if (psnRes.ok) setPsnSummary(await psnRes.json());
             }
+
+            // 4. Fetch Xbox Stats if linked
             if (linkedXboxId) {
                 const xboxRes = await fetch(`${API_URL}/api/xbox/profile/${linkedXboxId}`);
                 if (xboxRes.ok) setXboxSummary(await xboxRes.json());
@@ -82,38 +89,134 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
         setIsLoading(false);
     };
 
+    // --- SORTING AND FILTERING LOGIC ---
+    // 1. Filter by platform
     let processedGames = filter === 'All' ? megaLibrary : megaLibrary.filter(g => g.platform === filter);
+
+    // 2. Sort the filtered games
     if (sortBy === 'Name') {
         processedGames.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'Completion') {
+        // Sort highest percentage to lowest
         processedGames.sort((a, b) => (b.completionRate || 0) - (a.completionRate || 0));
     }
 
     return (
         <div>
             {/* --- TOP STATS BANNER --- */}
-            {/* ... (existing code for the 3 summary cards) ... */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+                
+                {/* Steam Summary Card */}
+                <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: '#1b2838', border: '1px solid #66c0f4', padding: '20px', borderRadius: '10px' }}>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#66c0f4' }}>Steam</h3>
+                    {steamSummary ? (
+                        <div>
+                            <img src={steamSummary.avatarfull} alt="Steam" style={{ width: '60px', borderRadius: '50%' }} />
+                            <h2>{steamSummary.personaname}</h2>
+                            <h3 style={{ color: '#cca43b' }}>Level {steamSummary.steamLevel || '?'}</h3>
+                        </div>
+                    ) : <p style={{ color: '#888' }}>Not Linked</p>}
+                </div>
+
+                {/* PSN Summary Card */}
+                <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: '#002266', border: '1px solid #003087', padding: '20px', borderRadius: '10px' }}>
+                    <h3 style={{ margin: '0 0 10px 0', color: 'white' }}>PlayStation</h3>
+                    {psnSummary && !psnSummary.error ? (
+                        <div>
+                            <h1 style={{ fontSize: '48px', margin: '10px 0', color: '#f5f5f5' }}>Lv. {psnSummary.level}</h1>
+                            <p style={{ color: '#b9a3e3' }}>Platinum: {psnSummary.earned?.platinum || 0}</p>
+                        </div>
+                    ) : <p style={{ color: '#888' }}>Not Linked or Synced</p>}
+                </div>
+
+                {/* Xbox Summary Card */}
+                <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: '#0e5c0e', border: '1px solid #107c10', padding: '20px', borderRadius: '10px' }}>
+                    <h3 style={{ margin: '0 0 10px 0', color: 'white' }}>Xbox</h3>
+                    {xboxSummary && !xboxSummary.error ? (
+                        <div>
+                            <img src={xboxSummary.avatar} alt="Xbox" style={{ width: '60px', borderRadius: '50%' }} />
+                            <h2>{xboxSummary.gamertag}</h2>
+                            <h3 style={{ color: '#cca43b' }}>{xboxSummary.gamerscore} Ⓖ</h3>
+                        </div>
+                    ) : <p style={{ color: '#888' }}>Not Linked</p>}
+                </div>
+            </div>
 
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
                     <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
-                    <button onClick={loadCentralHub} style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px' }} title="Re-fetch library">
+                    <button 
+                        onClick={loadCentralHub} 
+                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                        title="Re-fetch library to see updated completion rates"
+                    >
                         🔄 Refresh
                     </button>
                 </div>
-
-                {/* NEW: Hydration Status Bar */}
-                {hydrationStatus && <p style={{ color: '#a3cf06', fontSize: '12px' }}>{hydrationStatus}</p>}
-
-                {/* Filter and Sort Controls */}
-                {/* ... (existing code for filter/sort controls) ... */}
                 
+                {/* --- NEW: Hydration Status Bar --- */}
+                {hydrationStatus && (
+                    <p style={{ color: '#a3cf06', fontSize: '12px', fontStyle: 'italic' }}>{hydrationStatus}</p>
+                )}
+                
+                {/* Filter and Sort Controls */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                    {/* Platform Filter Buttons */}
+                    <div>
+                        <span style={{ color: '#888', marginRight: '10px' }}>Filter:</span>
+                        <button onClick={() => setFilter('All')} style={{ backgroundColor: filter === 'All' ? '#cca43b' : '#333', color: filter === 'All' ? 'black' : 'white', padding: '5px 10px' }}>All</button>
+                        <button onClick={() => setFilter('Steam')} style={{ backgroundColor: filter === 'Steam' ? '#66c0f4' : '#333', color: filter === 'Steam' ? 'black' : 'white', padding: '5px 10px', marginLeft: '5px' }}>Steam</button>
+                        <button onClick={() => setFilter('PSN')} style={{ backgroundColor: filter === 'PSN' ? '#003087' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>PlayStation</button>
+                        <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>Xbox</button>
+                    </div>
+
+                    {/* Sort Dropdown */}
+                    <div>
+                        <span style={{ color: '#888', marginRight: '10px' }}>Sort By:</span>
+                        <select 
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value)}
+                            style={{ padding: '8px', backgroundColor: '#333', color: 'white', border: '1px solid #555', borderRadius: '5px', cursor: 'pointer' }}
+                        >
+                            <option value="Name">Alphabetical (A-Z)</option>
+                            <option value="Completion">Completion % (High-Low)</option>
+                        </select>
+                    </div>
+                </div>
+
                 {isLoading ? <p>Loading your empire...</p> : (
                     <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
+                        {/* Mapping over processedGames */}
                         {processedGames.map(game => (
                             <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '200px', backgroundColor: '#1b2838', borderRadius: '5px', position: 'relative' }}>
-                                {/* ... (existing code for game card display, including completion rate) ... */}
+                                
+                                <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', color: 'white', backgroundColor: game.platform === 'PSN' ? '#003087' : game.platform === 'Xbox' ? '#107c10' : '#333' }}>
+                                    {game.platform}
+                                </span>
+                                
+                                <img 
+									src={game.platform === 'Steam' ? `https://steamcdn-a.akamaihd.net/steam/apps/${game.platformGameId}/header.jpg` : game.img_icon_url} 
+									alt={game.name} 
+									style={{ 
+										width: '100%', 
+										height: 'auto', 
+										aspectRatio: game.platform === 'Steam' ? '460/215' : '1/1', 
+										objectFit: 'cover',
+										marginBottom: '10px', 
+										borderRadius: '5px' 
+									}} 
+                                    // Fallback for missing Steam header images
+                                    onError={(e) => { if(game.platform === 'Steam') { e.target.onerror = null; e.target.src = `http://media.steampowered.com/steamcommunity/public/images/apps/${game.platformGameId}/${game.img_icon_url}.jpg`; } }}
+								/>
+                                <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', margin: '5px 0' }}>{game.name}</p>
+                                
+                                {/* Display Completion % on the card */}
+                                <p style={{ fontSize: '12px', color: '#cca43b', margin: '5px 0 0 0', fontWeight: 'bold' }}>
+                                    Completion: {game.completionRate || 0}%
+                                </p>
+                                
+                                {game.platform === 'Steam' && <p style={{ fontSize: '12px', color: '#a3cf06', margin: '0' }}>{(game.playtime_forever / 60).toFixed(1)} hrs</p>}
                             </div>
                         ))}
                     </div>
