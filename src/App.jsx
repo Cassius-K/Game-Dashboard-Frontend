@@ -100,7 +100,6 @@ function App() {
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
               <button onClick={() => setActiveTab('Steam')} style={{ backgroundColor: activeTab === 'Steam' ? '#66c0f4' : '#333', color: activeTab === 'Steam' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Steam View</button>
               <button onClick={() => setActiveTab('PSN')} style={{ backgroundColor: activeTab === 'PSN' ? '#003087' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>PlayStation View</button>
-              {/* NEW: Xbox Tab Button */}
               <button onClick={() => setActiveTab('Xbox')} style={{ backgroundColor: activeTab === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '10px 30px', fontWeight: 'bold' }}>Xbox View</button>
           </div>
 
