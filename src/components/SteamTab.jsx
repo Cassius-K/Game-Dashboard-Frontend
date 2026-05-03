@@ -121,11 +121,15 @@ export default function SteamTab({ username, API_URL, setServerMessage, linkedId
 
             const syncData = await syncRes.json();
             
-            // If Steam says the game has no achievements or profile is private
             if (syncData.error) {
                  alert(`Steam Error: ${syncData.error}`);
                  setServerMessage("");
                  return;
+            }
+
+            // NEW: If the backend hit a privacy wall, alert the user!
+            if (syncData.isPrivate) {
+                 alert("This player's Game Details are set to Private or Friends Only on Steam. We can only display the locked trophy list.");
             }
 
             // 2. Fetch the newly saved stats from our MongoDB
@@ -136,7 +140,7 @@ export default function SteamTab({ username, API_URL, setServerMessage, linkedId
             setServerMessage("");
         } catch (err) { 
             console.error("Achievement error:", err);
-            alert("Failed to load achievements. The game may be private or not support trophies.");
+            alert("Failed to load achievements. The game may not support trophies.");
             setServerMessage("Failed to fetch achievements."); 
         }
     };
