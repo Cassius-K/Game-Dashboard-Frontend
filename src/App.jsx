@@ -18,13 +18,15 @@ function App() {
   // Search Convenience States
   const [searchQuery, setSearchQuery] = useState(''); // Text typed in the search box
   const [searchResults, setSearchResults] = useState([]); // List of matching players found
+  const [wasSearchPerformed, setWasSearchPerformed] = useState(false); // Used for helper text
   
-  // --- NEW: PlayStation Convenience States ---
-  const [activePsnOnlineId, setActivePsnOnlineId] = useState(''); 
+  // NEW: PSN Specific States for the PlayStation Tab
+  const [activeTab, setActiveTab] = useState('Steam'); // Controls which platform view is visible
   const [psnProfile, setPsnProfile] = useState(null);
   const [psnStats, setPsnStats] = useState(null);
   const [psnSearchQuery, setPsnSearchQuery] = useState('');
   const [psnSearchResults, setPsnSearchResults] = useState([]);
+  const [activePsnOnlineId, setActivePsnOnlineId] = useState('');
 
   // Auth State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -65,6 +67,8 @@ function App() {
         setJwtToken(data.token);
         setIsLoggedIn(true);
         setUsername(data.username);
+        
+        // Check for Steam ID
         if (data.linkedSteamId) {
             setLinkedId(data.linkedSteamId);
             setSteamId(data.linkedSteamId); 
@@ -73,10 +77,12 @@ function App() {
         } else {
             setServerMessage(`Welcome ${data.username}! Please link your Steam account.`);
         }
-        // NEW: Load linked PSN ID on login
+
+        // NEW: Check for PSN ID on login
         if (data.psnAccountId) {
             setPsnAccountId(data.psnAccountId);
         }
+
       } else {
         alert(data.message);
         setServerMessage("");
@@ -99,10 +105,9 @@ function App() {
     setSearchResults([]);
     setSelectedAchievements(null);
     setLeaderboard([]);
+    setPsnAccountId(""); // NEW: Clear PSN data
     setPsnProfile(null);
     setPsnStats(null);
-    setActivePsnOnlineId('');
-    setPsnAccountId('');
     setServerMessage("Logged out.");
   };
   
@@ -145,9 +150,9 @@ function App() {
     } catch (err) {
         setServerMessage("Failed to link PSN.");
     }
-  };
+	};
 
-  const syncPsnData = async () => {
+	const syncPsnData = async () => {
     setServerMessage("Syncing PlayStation games...");
     try {
         const res = await fetch(`${API_URL}/api/psn/sync/${username}`, { method: 'POST' });
@@ -157,66 +162,17 @@ function App() {
     } catch (err) {
         setServerMessage("PSN Sync failed.");
     }
-  };
-
-  // --- NEW: PlayStation Search & Fetch Functions ---
-  const handlePsnSearch = async () => {
-    if (!psnSearchQuery || !psnAccountId) return alert("Must link PSN first to use search.");
-    setServerMessage("Searching PSN Network...");
-    setPsnSearchResults([]);
-
-    try {
-        const res = await fetch(`${API_URL}/api/search/psn/${username}/${psnSearchQuery}`);
-        const data = await res.json();
-        setPsnSearchResults(data);
-        if (data.length === 0) setServerMessage("No players found.");
-        else setServerMessage(`Found ${data.length} matches.`);
-    } catch (err) { setServerMessage("Search failed."); }
-  };
-
-  const selectPsnPlayer = (player) => {
-    setActivePsnOnlineId(player.onlineId);
-    setPsnAccountId(player.accountId);
-    setPsnSearchQuery(player.onlineId);
-    setPsnSearchResults([]);
-    setServerMessage("Player selected. Click 'Load Profile' to continue.");
-  };
-
-  const fetchPsnProfile = async () => {
-    if (!activePsnOnlineId) return alert("Please search or select a PSN ID first.");
-    setServerMessage("Fetching PSN profile...");
-    try {
-      const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
-      const data = await res.json();
-      
-      const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${data.accountId}`);
-      const statsData = await statsRes.json();
-
-      setPsnProfile(data);
-      setPsnStats(statsData);
-      setServerMessage("PSN Profile loaded.");
-    } catch (err) { setServerMessage("Error fetching PSN profile."); }
-  };
-
-  const loadPsnLibrary = async () => {
-    if (!psnAccountId) return alert("PSN account not linked.");
-    setServerMessage("Loading PSN Library...");
-    try {
-        const res = await fetch(`${API_URL}/api/games/${psnAccountId}`);
-        const data = await res.json();
-        setGamesLibrary(data);
-        setServerMessage(`Loaded ${data.length} PSN games.`);
-    } catch (err) {
-        setServerMessage("Failed to load PSN library.");
-    }
-  };
+	};
 
   // 4. Steam & Search Functions
+
   const handleSearch = async () => {
     if (!searchQuery) return;
     setServerMessage("Searching for players...");
     setSearchResults([]);
+    setWasSearchPerformed(true);
 
+    // If it's exactly 17 digits, treat it as a direct SteamID
     if (/^\d{17}$/.test(searchQuery)) {
         setSteamId(searchQuery);
         setServerMessage("Steam ID detected.");
@@ -275,26 +231,29 @@ function App() {
   };
 
   const loadLibrary = async () => {
-    if (!steamId) return;
-    setServerMessage("Loading games and stats from database...");
+    // NEW: Updated to support loading both Steam and PSN libraries depending on active tab
+    const activeTargetId = activeTab === 'Steam' ? steamId : psnAccountId;
+    if (!activeTargetId) return alert(`Please link or search a ${activeTab} account first.`);
+    
+    setServerMessage(`Loading ${activeTab} games and stats from database...`);
     try {
-        // Fetch Games
-        const res = await fetch(`${API_URL}/api/games/${steamId}`);
+        // Fetch Games for whichever ID is currently active
+        const res = await fetch(`${API_URL}/api/games/${activeTargetId}`);
         const data = await res.json();
         setGamesLibrary(data);
 
-        // Fetch Achievement Stats
-        const statsRes = await fetch(`${API_URL}/api/stats/${steamId}`);
-        const statsData = await statsRes.json();
-        
-        // Fetch Playtime Stats
-        const playtimeRes = await fetch(`${API_URL}/api/stats/playtime/${steamId}`);
-        const playtimeData = await playtimeRes.json();
+        // Fetch Steam Stats (PSN stats are fetched during profile load)
+        if (activeTab === 'Steam') {
+            const statsRes = await fetch(`${API_URL}/api/stats/${steamId}`);
+            const statsData = await statsRes.json();
+            
+            const playtimeRes = await fetch(`${API_URL}/api/stats/playtime/${steamId}`);
+            const playtimeData = await playtimeRes.json();
 
-        // Combine both sets of data into the stats state
-        setUserStats({ ...statsData, ...playtimeData });
+            setUserStats({ ...statsData, ...playtimeData });
+        }
 
-        setServerMessage(`Loaded ${data.length} games.`);
+        setServerMessage(`Loaded ${data.length} ${activeTab} games.`);
     } catch (err) {
         setServerMessage("Failed to load data from database.");
     }
@@ -312,9 +271,7 @@ function App() {
     }
   };
 
-  // --- UPDATED: Multi-Platform Achievement Loader ---
   const loadAchievements = async (game) => {
-      // Determine IDs and platform
       const gameId = game.appid || game.platformGameId;
       const platform = game.platform || 'Steam'; 
       
@@ -325,11 +282,9 @@ function App() {
       try {
           let dbData;
           if (platform === 'PSN') {
-              // Call the new PlayStation achievement route
               const res = await fetch(`${API_URL}/api/psn/achievements/${username}/${gameId}`);
               dbData = await res.json();
           } else {
-              // Call existing Steam achievement sync and then database fetch
               await fetch(`${API_URL}/api/steam/achievements/${steamId}/${gameId}`);
               const dbRes = await fetch(`${API_URL}/api/achievements/${steamId}/${gameId}`);
               dbData = await dbRes.json();
@@ -347,6 +302,44 @@ function App() {
       setSteamId(linkedId);
       setSearchQuery(linkedId);
       setServerMessage("Switched back to your profile.");
+  };
+
+  // --- NEW: PlayStation specific helper functions ---
+  const handlePsnSearch = async () => {
+    if (!psnSearchQuery || !psnAccountId) return alert("Must link PSN first to use search.");
+    setServerMessage("Searching PSN Network...");
+    setPsnSearchResults([]);
+    try {
+        const res = await fetch(`${API_URL}/api/search/psn/${username}/${psnSearchQuery}`);
+        const data = await res.json();
+        setPsnSearchResults(data);
+        if (data.length === 0) setServerMessage("No players found.");
+        else setServerMessage(`Found ${data.length} matches.`);
+    } catch (err) { setServerMessage("Search failed."); }
+  };
+
+  const selectPsnPlayer = (player) => {
+    setActivePsnOnlineId(player.onlineId);
+    setPsnAccountId(player.accountId);
+    setPsnSearchQuery(player.onlineId);
+    setPsnSearchResults([]);
+    setServerMessage("PSN Player selected. Click 'Load Profile' to continue.");
+  };
+
+  const fetchPsnProfile = async () => {
+    if (!activePsnOnlineId) return alert("Please search or select a PSN ID first.");
+    setServerMessage("Fetching PSN profile...");
+    try {
+      const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
+      const data = await res.json();
+      
+      const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${data.accountId}`);
+      const statsData = await statsRes.json();
+
+      setPsnProfile(data);
+      setPsnStats(statsData);
+      setServerMessage("PSN Profile loaded.");
+    } catch (err) { setServerMessage("Error fetching PSN profile."); }
   };
 
   return (
@@ -376,180 +369,189 @@ function App() {
               <button onClick={handleLogout} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 15px' }}>Logout</button>
           </div>
 
-          {/* Player Search and Command Panel */}
-          <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
-                <div>
-                    <h3 style={{ margin: '0 0 5px 0' }}>Steam Player Tracker & Search</h3>
-                    <p style={{ fontSize: '12px', color: '#888', marginBottom: '15px' }}>
-                        Search for tracked players by name, or enter a <strong>SteamID64</strong> or <strong>Custom URL</strong> to track a new player.
-                    </p>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                        <input 
-                            type="text" 
-                            value={searchQuery} 
-                            onChange={(e) => setSearchQuery(e.target.value)} 
-                            placeholder="e.g. 76561198... or GabeNewell"
-                            style={{ padding: '10px', width: '250px' }}
-                        />
-                        <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
-                    </div>
+          {/* --- NEW: PLATFORM SWITCHER TABS --- */}
+          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              <button onClick={() => { setActiveTab('Steam'); setGamesLibrary([]); setSelectedAchievements(null); }} style={{ backgroundColor: activeTab === 'Steam' ? '#66c0f4' : '#333', color: activeTab === 'Steam' ? 'black' : 'white', padding: '10px 30px', fontWeight: 'bold' }}>Steam View</button>
+              <button onClick={() => { setActiveTab('PSN'); setGamesLibrary([]); setSelectedAchievements(null); }} style={{ backgroundColor: activeTab === 'PSN' ? '#003087' : '#333', color: 'white', padding: '10px 30px', marginLeft: '5px', fontWeight: 'bold' }}>PlayStation View</button>
+          </div>
 
-                    {/* Search Results Dropdown List */}
-                    {searchResults.length > 0 && (
-                        <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
-                            {searchResults.map(player => (
-                                <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
-                                    <span>{player.personaname}</span>
-                                    {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto', backgroundColor: '#333', padding: '2px 5px', borderRadius: '3px' }}>New to DB</span>}
+          {/* Conditional Rendering based on activeTab */}
+          {activeTab === 'Steam' ? (
+              <>
+                {/* --- STEAM: Player Search and Command Panel --- */}
+                <div className="card" style={{ padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
+                        <div>
+                            <h3 style={{ margin: '0 0 5px 0' }}>Player Tracker & Search</h3>
+                            <p style={{ fontSize: '12px', color: '#888', marginBottom: '15px' }}>
+                                Search for tracked players by name, or enter a <strong>SteamID64</strong> or <strong>Custom URL</strong> to track a new player.
+                            </p>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                                <input 
+                                    type="text" 
+                                    value={searchQuery} 
+                                    onChange={(e) => setSearchQuery(e.target.value)} 
+                                    placeholder="e.g. 76561198... or GabeNewell"
+                                    style={{ padding: '10px', width: '250px' }}
+                                />
+                                <button onClick={handleSearch} style={{ backgroundColor: '#66c0f4', color: 'black' }}>Search</button>
+                            </div>
+
+                            {/* Search Results Dropdown List */}
+                            {searchResults.length > 0 && (
+                                <div style={{ backgroundColor: '#171a21', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
+                                    {searchResults.map(player => (
+                                        <div key={player.steamId || player.steamid} onClick={() => selectPlayer(player.steamId || player.steamid)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
+                                            <span>{player.personaname}</span>
+                                            {player.isNew && <span style={{ fontSize: '10px', color: '#888', marginLeft: 'auto', backgroundColor: '#333', padding: '2px 5px', borderRadius: '3px' }}>New to DB</span>}
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+                            )}
+
+                            {wasSearchPerformed && searchResults.length === 0 && (
+                                <div style={{ fontSize: '12px', color: '#888', marginTop: '10px', padding: '10px', backgroundColor: '#171a21', borderRadius: '5px' }}>
+                                    <p style={{ margin: 0 }}>**No results found.** The Steam API doesn't support partial name searches.</p>
+                                    <p style={{ margin: '5px 0 0 0' }}>To find a new player, please enter their **full SteamID64** or their **exact Custom URL name**.</p>
+                                </div>
+                            )}
+                            
+                            <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                                <p>Active Profile: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
+                                
+                                {/* Control Buttons */}
+                                {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
+                                {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
+
+                                <button id="btn-fetch" onClick={fetchSteamProfile}>1. Load Profile</button>
+                                <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
+                                <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
+                                <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
+                            </div>
+                        </div>
+                </div>
+
+                {/* STEAM: Profile Card and Statistics View */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+                    {profile && (
+                        <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
+                        <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
+                        <h2>{profile.personaname}</h2>
+                        <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
+                        <a href={profile.profileurl} target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>View Steam Profile</a>
                         </div>
                     )}
-                    
-                    <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
-                        <p>Active Steam Profile: <strong style={{ color: '#66c0f4' }}>{steamId || "None Selected"}</strong></p>
-                        
-                        {/* Control Buttons */}
-                        {!linkedId && steamId && <button onClick={handleLinkSteam} style={{ backgroundColor: '#cca43b', color: 'black', marginBottom: '10px' }}>Link to My Account</button>}
-                        {linkedId && steamId !== linkedId && <button onClick={backToMyProfile} style={{ display: 'block', margin: '0 auto 10px auto' }}>Back to Me</button>}
 
-                        <button id="btn-fetch" onClick={fetchSteamProfile}>1. Load Steam Profile</button>
-                        <button onClick={syncData} style={{ backgroundColor: '#2a475e', marginLeft: '10px' }}>2. Sync to DB</button>
-                        <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', marginLeft: '10px' }}>3. View Library</button>
-                        <button onClick={loadLeaderboard} style={{ backgroundColor: '#6600cc', marginLeft: '10px' }}>4. View Leaderboard</button>
-                    </div>
-                </div>
-          </div>
-
-          {/* --- NEW: PlayStation Integration Card (Now with Search capabilities) --- */}
-          <div className="card" style={{ padding: '20px', backgroundColor: '#003087', borderRadius: '10px', marginTop: '10px', position: 'relative' }}>
-                <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Tracker & Search</h3>
-                {!psnAccountId ? (
-                    <div>
-                        <p style={{ fontSize: '11px', color: '#ccc' }}>Get your token from: <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: 'white' }}>Sony SSOCookie</a></p>
-                        <input 
-                            type="text" 
-                            placeholder="Paste npsso token here" 
-                            value={npsso} 
-                            onChange={e => setNpsso(e.target.value)} 
-                            style={{ padding: '10px', width: '250px' }} 
-                        />
-                        <button onClick={handleLinkPsn} style={{ marginLeft: '10px', backgroundColor: '#f5f5f5', color: '#003087' }}>Link PSN</button>
-                    </div>
-                ) : (
-                    <div>
-                        <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '15px' }}>Search the PSN Network by Online ID.</p>
-                        
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                            <input 
-                                type="text" 
-                                value={psnSearchQuery} 
-                                onChange={(e) => setPsnSearchQuery(e.target.value)} 
-                                placeholder="e.g. xX_Sniper_Xx"
-                                style={{ padding: '10px', width: '250px' }}
-                            />
-                            <button onClick={handlePsnSearch} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>Search PSN</button>
+                    {userStats && (
+                        <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
+                            <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Data Hub</h2>
+                            <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
+                            <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
+                            <div style={{ display: 'flex', justifyContent: 'space-around', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '15px' }}>
+                                <div>
+                                    <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
+                                    <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Unlocked</p>
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: '0', color: '#fff' }}>{userStats.total}</h3>
+                                    <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 style={{ margin: '0', color: '#fff' }}>{userStats.totalHours?.toLocaleString()}</h3>
+                                <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Total Hours Played</p>
+                            </div>
                         </div>
+                    )}
+                </div>
+              </>
+          ) : (
+              <>
+                {/* --- PLAYSTATION: Integration Card & Search --- */}
+                <div className="card" style={{ padding: '20px', backgroundColor: '#001a4d', borderRadius: '10px', marginTop: '10px', position: 'relative' }}>
+                        <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Integration & Search</h3>
+                        {!psnAccountId ? (
+                            <div>
+                                <p style={{ fontSize: '11px', color: '#ccc' }}>Get your token from: <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noreferrer" style={{ color: 'white' }}>Sony SSOCookie</a></p>
+                                <input 
+                                    type="text" 
+                                    placeholder="Paste npsso token here" 
+                                    value={npsso} 
+                                    onChange={e => setNpsso(e.target.value)} 
+                                    style={{ padding: '10px', width: '250px' }} 
+                                />
+                                <button onClick={handleLinkPsn} style={{ marginLeft: '10px', backgroundColor: '#f5f5f5', color: '#003087' }}>Link PSN</button>
+                            </div>
+                        ) : (
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '15px' }}>
+                                    <input type="text" value={psnSearchQuery} onChange={(e) => setPsnSearchQuery(e.target.value)} placeholder="Search PSN Name (e.g. xX_Sniper_Xx)" style={{ padding: '10px', width: '250px' }} />
+                                    <button onClick={handlePsnSearch} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>Search PSN</button>
+                                </div>
 
-                        {/* PSN Search Results Dropdown List */}
-                        {psnSearchResults.length > 0 && (
-                            <div style={{ backgroundColor: '#002266', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
-                                {psnSearchResults.map(player => (
-                                    <div key={player.accountId} onClick={() => selectPsnPlayer(player)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}>
-                                        <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
-                                        <span>{player.onlineId}</span>
+                                {/* PSN Search Results Dropdown List */}
+                                {psnSearchResults.length > 0 && (
+                                    <div style={{ backgroundColor: '#002266', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
+                                        {psnSearchResults.map(player => (
+                                            <div key={player.accountId} onClick={() => selectPsnPlayer(player)} style={{ padding: '10px', borderBottom: '1px solid #333', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}>
+                                                <img src={player.avatar} alt="av" style={{ width: '25px', borderRadius: '3px' }} />
+                                                <span>{player.onlineId}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                )}
+
+                                <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                                    <p style={{ color: 'white' }}>Active PSN Profile: <strong style={{ color: '#66c0f4' }}>{activePsnOnlineId || "None Selected"}</strong></p>
+                                    <p style={{ color: '#aaa', fontSize: '12px' }}>Your Linked Account ID: {psnAccountId}</p>
+                                    <button onClick={fetchPsnProfile} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load Profile</button>
+                                    <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white', marginLeft: '10px' }}>2. Sync PSN Games</button>
+                                    <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>3. View Library</button>
+                                </div>
                             </div>
                         )}
+                </div>
 
-                        <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
-                            <p style={{ color: 'white' }}>Active PSN Profile: <strong style={{ color: '#66c0f4' }}>{activePsnOnlineId || "None Selected"}</strong></p>
+                {/* PLAYSTATION: Profile Card & Trophy Hub */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
+                    {psnProfile && (
+                        <div className="profile-card" style={{ padding: '20px', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', backgroundColor: '#001a4d', color: 'white' }}>
+                        <img src={psnProfile.avatar} alt="Avatar" style={{ borderRadius: '50%', width: '100px' }} />
+                        <h2>{psnProfile.onlineId}</h2>
+                        <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#ccc' }}>"{psnProfile.aboutMe}"</p>
+                        </div>
+                    )}
+
+                    {psnStats && (
+                        <div className="stats-card" style={{ padding: '20px', backgroundColor: '#002266', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', textAlign: 'center', color: 'white' }}>
+                            <h2 style={{ margin: '0 0 15px 0', color: '#ccc' }}>Trophy Hub</h2>
+                            <h1 style={{ fontSize: '48px', margin: '0', color: '#f5f5f5' }}>Lv. {psnStats.level}</h1>
+                            <p style={{ margin: '0 0 20px 0', color: '#888' }}>{psnStats.progress}% to next level</p>
                             
-                            <button onClick={fetchPsnProfile} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load PSN Profile</button>
-                            <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white', marginLeft: '10px' }}>2. Sync My PSN Games</button>
-                            <button onClick={loadPsnLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>3. View My PSN Library</button>
+                            <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                                <div><strong style={{ color: '#b9a3e3' }}>{psnStats.earned.platinum}</strong><br/><small>Platinum</small></div>
+                                <div><strong style={{ color: '#e6c300' }}>{psnStats.earned.gold}</strong><br/><small>Gold</small></div>
+                                <div><strong style={{ color: '#a6a6a6' }}>{psnStats.earned.silver}</strong><br/><small>Silver</small></div>
+                                <div><strong style={{ color: '#cd7f32' }}>{psnStats.earned.bronze}</strong><br/><small>Bronze</small></div>
+                            </div>
                         </div>
-                    </div>
-                )}
-          </div>
-
-          {/* Profile Card and Statistics View (Supports both Steam and PSN) */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-              
-              {/* Existing Steam Profile Card */}
-              {profile && (
-                <div className="profile-card" style={{ padding: '20px', border: '1px solid #66c0f4', borderRadius: '8px', minWidth: '250px' }}>
-                  <img src={profile.avatarfull} alt="Avatar" style={{ borderRadius: '50%' }} />
-                  <h2>{profile.personaname}</h2>
-                  <p>Status: {profile.personastate === 1 ? "Online" : "Offline"}</p>
-                  <a href={profile.profileurl} target="_blank" rel="noreferrer" style={{ color: '#66c0f4' }}>View Steam Profile</a>
+                    )}
                 </div>
-              )}
+              </>
+          )}
 
-              {/* Existing Steam Stats Card */}
-              {userStats && (
-                <div className="stats-card" style={{ padding: '20px', backgroundColor: '#171a21', border: '1px solid #c7d5e0', borderRadius: '8px', minWidth: '250px', textAlign: 'center' }}>
-                    <h2 style={{ margin: '0 0 15px 0', color: '#c7d5e0' }}>Steam Data Hub</h2>
-                    <h1 style={{ fontSize: '48px', margin: '0', color: '#66c0f4' }}>{userStats.completionRate}%</h1>
-                    <p style={{ margin: '0 0 20px 0', color: '#888' }}>Avg. Completion</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-around', borderBottom: '1px solid #333', paddingBottom: '15px', marginBottom: '15px' }}>
-                        <div>
-                            <h3 style={{ margin: '0', color: '#fff' }}>{userStats.unlocked}</h3>
-                            <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Unlocked</p>
-                        </div>
-                        <div>
-                            <h3 style={{ margin: '0', color: '#fff' }}>{userStats.total}</h3>
-                            <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Tracked</p>
-                        </div>
-                    </div>
-                    <div>
-                        <h3 style={{ margin: '0', color: '#fff' }}>{userStats.totalHours?.toLocaleString()}</h3>
-                        <p style={{ margin: '0', fontSize: '12px', color: '#888' }}>Total Hours Played</p>
-                    </div>
-                </div>
-              )}
+          {/* --- COMMON ELEMENTS (Shown below whichever tab is active) --- */}
 
-              {/* NEW: PSN Profile Card */}
-              {psnProfile && (
-                <div className="profile-card" style={{ padding: '20px', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', backgroundColor: '#001a4d', color: 'white' }}>
-                  <img src={psnProfile.avatar} alt="Avatar" style={{ borderRadius: '50%', width: '100px' }} />
-                  <h2>{psnProfile.onlineId}</h2>
-                  <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#ccc' }}>"{psnProfile.aboutMe}"</p>
-                </div>
-              )}
-
-              {/* NEW: PSN Trophy Stats Card */}
-              {psnStats && (
-                <div className="stats-card" style={{ padding: '20px', backgroundColor: '#002266', border: '1px solid #003087', borderRadius: '8px', minWidth: '250px', textAlign: 'center', color: 'white' }}>
-                    <h2 style={{ margin: '0 0 15px 0', color: '#ccc' }}>Trophy Hub</h2>
-                    <h1 style={{ fontSize: '48px', margin: '0', color: '#f5f5f5' }}>Lv. {psnStats.level}</h1>
-                    <p style={{ margin: '0 0 20px 0', color: '#888' }}>{psnStats.progress}% to next level</p>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #333', paddingTop: '15px' }}>
-                        <div><strong style={{ color: '#b9a3e3', fontSize: '20px' }}>{psnStats.earned.platinum}</strong><br/><small>Platinum</small></div>
-                        <div><strong style={{ color: '#e6c300', fontSize: '20px' }}>{psnStats.earned.gold}</strong><br/><small>Gold</small></div>
-                        <div><strong style={{ color: '#a6a6a6', fontSize: '20px' }}>{psnStats.earned.silver}</strong><br/><small>Silver</small></div>
-                        <div><strong style={{ color: '#cd7f32', fontSize: '20px' }}>{psnStats.earned.bronze}</strong><br/><small>Bronze</small></div>
-                    </div>
-                </div>
-              )}
-          </div>
-
-          {/* --- UPDATED: Multi-Platform Game Library Grid Display --- */}
+          {/* Game Library Grid Display */}
           {gamesLibrary.length > 0 && (
               <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '30px', justifyContent: 'center' }}>
                   {gamesLibrary.map(game => (
                       <div key={game._id || game.appid} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '220px', backgroundColor: '#171a21', borderRadius: '5px', position: 'relative' }}>
-                          
-                          {/* Platform Badge */}
                           <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', backgroundColor: game.platform === 'PSN' ? '#003087' : '#1b2838', color: 'white' }}>
                               {game.platform || 'Steam'}
                           </span>
 
-                          {/* Dynamic Image Source based on platform */}
                           <img 
                             src={game.platform === 'PSN' ? game.img_icon_url : `http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid || game.platformGameId}/${game.img_icon_url}.jpg`} 
                             alt={game.name} 
