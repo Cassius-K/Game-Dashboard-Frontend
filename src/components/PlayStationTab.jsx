@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 
 export default function PlayStationTab({ username, API_URL, setServerMessage, initialAccountId }) {
     const [npsso, setNpsso] = useState('');
-    
-    // NEW: We use this robust flag to determine what UI to show
     const [isLinked, setIsLinked] = useState(!!initialAccountId); 
     
-    const [psnAccountId, setPsnAccountId] = useState(initialAccountId || '');
-    const [activePsnOnlineId, setActivePsnOnlineId] = useState(initialAccountId ? "My Account" : "");
+    // Core IDs
+    const [psnAccountId, setPsnAccountId] = useState(initialAccountId || ''); // The logged in user's ID
+    const [activePsnAccountId, setActivePsnAccountId] = useState(''); // The ID we are CURRENTLY looking at
+    const [activePsnOnlineId, setActivePsnOnlineId] = useState(''); // The Username we are CURRENTLY looking at
+
+    // UI State
     const [psnSearchQuery, setPsnSearchQuery] = useState('');
     const [psnSearchResults, setPsnSearchResults] = useState([]);
     const [psnProfile, setPsnProfile] = useState(null);
@@ -16,11 +18,13 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     const [selectedAchievements, setSelectedAchievements] = useState(null);
     const [activeGameName, setActiveGameName] = useState("");
 
-    // Effect to catch when the user logs in and the app passes down the initialAccountId
+    // Effect to catch when the user logs in
     useEffect(() => {
         if (initialAccountId) {
             setIsLinked(true);
             setPsnAccountId(initialAccountId);
+            // Default to viewing yourself
+            setActivePsnAccountId(initialAccountId);
             setActivePsnOnlineId("My Account");
         }
     }, [initialAccountId]);
@@ -36,13 +40,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             const data = await res.json();
             
             if (res.ok) {
-                // FORCE the UI to switch, regardless of what the accountId variable looks like
                 setIsLinked(true); 
-                if (data.accountId && data.accountId !== "me") {
-                    setPsnAccountId(data.accountId);
-                } else {
-                    setPsnAccountId("Linked"); // Fallback so we know it worked
-                }
+                const newId = data.accountId && data.accountId !== "me" ? data.accountId : "Linked";
+                setPsnAccountId(newId);
+                setActivePsnAccountId(newId);
                 setActivePsnOnlineId("My Account");
                 alert("PSN Linked successfully!");
             } else {
@@ -59,35 +60,51 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
             const res = await fetch(`${API_URL}/api/search/psn/${username}/${psnSearchQuery}`);
             const data = await res.json();
             setPsnSearchResults(data);
-            setServerMessage(`Found ${data.length} matches.`);
+            if (data.length === 0) setServerMessage("No players found. (Note: You cannot search for yourself).");
+            else setServerMessage(`Found ${data.length} matches.`);
         } catch (err) { setServerMessage("Search failed."); }
     };
 
     const selectPsnPlayer = (player) => {
         setActivePsnOnlineId(player.onlineId);
-        setPsnAccountId(player.accountId);
+        setActivePsnAccountId(player.accountId);
         setPsnSearchResults([]);
         setServerMessage("Player selected. Click 'Load Profile'.");
     };
 
-    const fetchPsnProfile = async () => {
-        if (!activePsnOnlineId || !isLinked) return alert("Please link PSN or select an ID.");
+    // NEW: Shortcut to bypass search and load the logged-in user
+    const loadMyProfileShortcut = () => {
+        setActivePsnAccountId(psnAccountId);
+        setActivePsnOnlineId("me"); // "me" is a special keyword the PSN API understands for the authenticated user
+        setServerMessage("Switched to your profile. Loading data...");
+        // Use a tiny timeout to ensure state updates before fetching
+        setTimeout(() => fetchPsnProfile("me", psnAccountId), 50); 
+    };
+
+    // Updated to accept parameters so the shortcut can pass them directly
+    const fetchPsnProfile = async (targetOnlineId = activePsnOnlineId, targetAccountId = activePsnAccountId) => {
+        if (!targetOnlineId || !targetAccountId) return alert("Please link PSN or select an ID.");
         setServerMessage("Fetching PSN profile...");
         try {
-            const res = await fetch(`${API_URL}/api/psn/profile/${username}/${activePsnOnlineId}`);
+            const res = await fetch(`${API_URL}/api/psn/profile/${username}/${targetOnlineId}`);
             const data = await res.json();
-            const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${data.accountId}`);
+            const statsRes = await fetch(`${API_URL}/api/psn/trophy-summary/${username}/${targetAccountId}`);
             const statsData = await statsRes.json();
+            
             setPsnProfile(data);
             setPsnStats(statsData);
             setServerMessage("PSN Profile loaded.");
+            
+            // If we used the "me" shortcut, let's update the UI to show their real online ID now that we have it
+            if (targetOnlineId === "me" && data.onlineId) {
+                setActivePsnOnlineId(data.onlineId);
+            }
         } catch (err) { setServerMessage("Error fetching profile."); }
     };
 
     const syncPsnData = async () => {
-        // If we are looking at "My Account" we just pass the username to the backend, 
-        // the backend will pull our own npsso token and find our AccountID automatically.
-        let targetId = psnAccountId === "Linked" ? "me" : psnAccountId;
+        // If we are looking at our own account, we pass "me" to the backend
+        let targetId = activePsnAccountId === psnAccountId ? "me" : activePsnAccountId;
         
         setServerMessage("Syncing PlayStation games...");
         try {
@@ -100,8 +117,8 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
 
     const loadLibrary = async () => {
         setServerMessage("Loading PSN Library...");
-        // If we don't have a strict numerical ID yet, ask backend to fetch based on username
-        const fetchId = psnAccountId === "Linked" ? username : psnAccountId; 
+        // If it's our own account, we might just have the "Linked" string, so we tell the backend to use our username
+        const fetchId = activePsnAccountId === psnAccountId ? username : activePsnAccountId; 
         
         const res = await fetch(`${API_URL}/api/games/${fetchId}`);
         const data = await res.json();
@@ -123,7 +140,6 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
     return (
         <div>
             <div className="card" style={{ padding: '20px', backgroundColor: '#001a4d', borderRadius: '10px', marginTop: '20px', position: 'relative' }}>
-                {/* LOGIC FIX: Now using 'isLinked' boolean instead of checking the ID string */}
                 {!isLinked ? (
                     <div>
                         <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Account Setup</h3>
@@ -137,10 +153,18 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                 ) : (
                     <div>
                         <h3 style={{ color: 'white', margin: '0 0 5px 0' }}>PlayStation Tracker & Search</h3>
+                        
+                        {/* --- NEW: Load My Profile Shortcut --- */}
+                        <div style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #333' }}>
+                            <p style={{ color: 'white', margin: '0 0 10px 0' }}>PSN Status: <strong style={{ color: 'lightgreen' }}>Connected</strong></p>
+                            <button onClick={loadMyProfileShortcut} style={{ backgroundColor: '#cca43b', color: 'black', fontWeight: 'bold' }}>⭐ Load My Profile</button>
+                        </div>
+
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                            <input type="text" value={psnSearchQuery} onChange={(e) => setPsnSearchQuery(e.target.value)} placeholder="e.g. xX_Sniper_Xx" style={{ padding: '10px', width: '250px' }} />
+                            <input type="text" value={psnSearchQuery} onChange={(e) => setPsnSearchQuery(e.target.value)} placeholder="Search other players (e.g. xX_Sniper_Xx)" style={{ padding: '10px', width: '280px' }} />
                             <button onClick={handlePsnSearch} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>Search PSN</button>
                         </div>
+                        
                         {psnSearchResults.length > 0 && (
                             <div style={{ backgroundColor: '#002266', border: '1px solid #555', borderRadius: '5px', width: '310px', margin: '5px auto', textAlign: 'left', position: 'absolute', zIndex: 10, left: '50%', transform: 'translateX(-50%)', maxHeight: '300px', overflowY: 'auto' }}>
                                 {psnSearchResults.map(player => (
@@ -151,9 +175,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                                 ))}
                             </div>
                         )}
-                        <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+
+                        <div style={{ marginTop: '20px', paddingTop: '10px' }}>
                             <p style={{ color: 'white' }}>Active PSN Profile: <strong style={{ color: '#66c0f4' }}>{activePsnOnlineId || "None Selected"}</strong></p>
-                            <button onClick={fetchPsnProfile} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load Profile</button>
+                            <button onClick={() => fetchPsnProfile()} style={{ backgroundColor: '#f5f5f5', color: '#003087' }}>1. Load Profile</button>
                             <button onClick={syncPsnData} style={{ backgroundColor: '#2a475e', color: 'white', marginLeft: '10px' }}>2. Sync to DB</button>
                             <button onClick={loadLibrary} style={{ backgroundColor: '#107c10', color: 'white', marginLeft: '10px' }}>3. View Library</button>
                         </div>
@@ -190,9 +215,9 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                         <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '220px', backgroundColor: '#171a21', borderRadius: '5px', position: 'relative' }}>
                             <span style={{ position: 'absolute', top: '5px', right: '5px', fontSize: '10px', padding: '2px 5px', borderRadius: '3px', backgroundColor: '#003087', color: 'white' }}>PSN</span>
                             <img src={game.img_icon_url} alt={game.name} style={{ width: '64px', height: '64px', marginBottom: '10px', borderRadius: '5px' }} />
-                            <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px' }}>{game.name}</p>
+                            <p style={{ fontSize: '14px', fontWeight: 'bold', minHeight: '40px', color: 'white' }}>{game.name}</p>
                             <p style={{ fontSize: '12px', color: '#888' }}>ID: {game.platformGameId}</p>
-                            <button onClick={() => loadAchievements(game)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px' }}>View Trophies</button>
+                            <button onClick={() => loadAchievements(game)} style={{ fontSize: '12px', padding: '5px 10px', marginTop: '10px', backgroundColor: '#003087', color: 'white' }}>View Trophies</button>
                         </div>
                     ))}
                 </div>
@@ -200,10 +225,10 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
 
             {selectedAchievements && (
                 <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
-                    <h2>🏆 Trophies for {activeGameName}</h2>
+                    <h2 style={{ color: 'white' }}>🏆 Trophies for {activeGameName}</h2>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px', marginTop: '20px' }}>
                         {selectedAchievements.map((ach, index) => (
-                            <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: ach.achieved ? '#2a475e' : '#171a21', padding: '10px', borderRadius: '5px', border: ach.achieved ? '1px solid #66c0f4' : '1px solid #333', opacity: ach.achieved ? 1 : 0.6 }}>
+                            <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: ach.achieved ? '#003087' : '#171a21', padding: '10px', borderRadius: '5px', border: ach.achieved ? '1px solid #66c0f4' : '1px solid #333', opacity: ach.achieved ? 1 : 0.6 }}>
                                 <img src={ach.iconUrl} alt={ach.apiname} style={{ width: '50px', height: '50px', marginRight: '15px', borderRadius: '5px' }} />
                                 <div style={{ textAlign: 'left' }}>
                                     <h4 style={{ margin: '0 0 5px 0', color: ach.achieved ? '#fff' : '#888' }}>{ach.displayName}</h4>
