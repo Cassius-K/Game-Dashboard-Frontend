@@ -10,9 +10,10 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
     const [xboxSummary, setXboxSummary] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
+    // We use a function inside useEffect so we can call it again on demand
     useEffect(() => {
         loadCentralHub();
-    }, [linkedSteamId, linkedPsnId, linkedXboxId]);
+    }, []); // Only run once on initial load
 
     const loadCentralHub = async () => {
         setIsLoading(true);
@@ -101,6 +102,15 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
                 <h2 style={{ color: 'white' }}>Mega Library ({megaLibrary.length} Games)</h2>
+				{/* --- NEW: REFRESH BUTTON --- */}
+                    <button 
+                        onClick={loadCentralHub} 
+                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px' }}
+                        title="Re-fetch library to see updated completion rates"
+                    >
+                        🔄 Refresh
+                    </button>
+                </div>
                 
                 {/* Filter and Sort Controls */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
