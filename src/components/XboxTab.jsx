@@ -12,6 +12,7 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
     const [gamesLibrary, setGamesLibrary] = useState([]);
     const [selectedAchievements, setSelectedAchievements] = useState(null);
     const [activeGameName, setActiveGameName] = useState("");
+    const [achievementError, setAchievementError] = useState(null); // NEW: State to track API limitation errors
 
     useEffect(() => {
         if (linkedId) {
@@ -43,7 +44,7 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         } catch (err) { setServerMessage("Failed to link Xbox account."); }
     };
 
-    // --- FIXED: Advanced Search Logic ---
+    // --- Advanced Search Logic ---
     const handleSearch = async () => {
         if (!searchQuery) return;
         setServerMessage("Searching Xbox Network...");
@@ -65,7 +66,7 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         } catch (err) { setServerMessage("Search failed due to network error."); }
     };
 
-    // --- FIXED: Selection Logic ---
+    // --- Selection Logic ---
     const selectPlayer = (player) => {
         setXboxXuid(player.xuid);          // Set the internal ID for API calls
         setSearchQuery(player.gamertag);     // Put their name in the search box
@@ -111,16 +112,27 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
         setServerMessage(`Fetching achievements for ${game.name}...`);
         setActiveGameName(game.name);
         setSelectedAchievements(null);
+        setAchievementError(null); // Clear previous errors
+
         try {
             const syncRes = await fetch(`${API_URL}/api/xbox/achievements/${xboxXuid}/${game.platformGameId}`);
             const syncData = await syncRes.json();
-            if (syncData.error) return alert(`Xbox API Error: ${syncData.error}`);
+            
+            // If we hit the Xbox One/Series API restriction, set the error state and stop
+            if (syncData.error) {
+                setAchievementError(syncData.details || syncData.error);
+                setServerMessage("");
+                return;
+            }
             
             const dbRes = await fetch(`${API_URL}/api/achievements/${xboxXuid}/${game.platformGameId}`);
             const dbData = await dbRes.json();
             setSelectedAchievements(dbData);
             setServerMessage("");
-        } catch (err) { setServerMessage("Failed to fetch achievements."); }
+        } catch (err) { 
+            setAchievementError("Failed to fetch achievements from the server.");
+            setServerMessage(""); 
+        }
     };
 
     const backToMyProfile = () => {
@@ -194,7 +206,16 @@ export default function XboxTab({ username, API_URL, setServerMessage, linkedId,
                 </div>
             )}
 
-            {selectedAchievements && (
+            {/* NEW: Elegant Error Display for API Restrictions */}
+            {achievementError && (
+                <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px', border: '1px solid #cca43b' }}>
+                    <h2 style={{ color: '#cca43b' }}>⚠️ API Limitation: {activeGameName}</h2>
+                    <p style={{ color: '#ccc', lineHeight: '1.5' }}>{achievementError}</p>
+                </div>
+            )}
+
+            {/* Existing Achievements Detail View */}
+            {selectedAchievements && !achievementError && (
                 <div className="achievements-section" style={{ marginTop: '40px', padding: '20px', backgroundColor: '#1b2838', borderRadius: '10px' }}>
                     <h2 style={{ color: 'white' }}>🏆 Achievements for {activeGameName}</h2>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px', marginTop: '20px' }}>
