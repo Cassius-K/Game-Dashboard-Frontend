@@ -241,9 +241,15 @@ export default function PlayStationTab({ username, API_URL, setServerMessage, in
                             <div key={index} style={{ display: 'flex', alignItems: 'center', backgroundColor: ach.achieved ? '#003087' : '#171a21', padding: '10px', borderRadius: '5px', border: ach.achieved ? '1px solid #66c0f4' : '1px solid #333', opacity: ach.achieved ? 1 : 0.6 }}>
                                 <img src={ach.iconUrl} alt={ach.apiname} style={{ width: '50px', height: '50px', marginRight: '15px', borderRadius: '5px' }} />
                                 <div style={{ textAlign: 'left', color: 'white' }}>
-                                    <h4 style={{ margin: '0 0 5px 0' }}>{ach.displayName}</h4>
-                                    <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>{ach.description}</p>
-                                </div>
+									<h4 style={{ margin: '0 0 5px 0' }}>{ach.displayName}</h4>
+									<p style={{ margin: 0, fontSize: '12px', color: '#ccc' }}>{ach.description}</p>
+									{/* NEW: Show the Unlock Date if Achieved */}
+									{ach.achieved === 1 && ach.unlocktime > 0 && (
+										<p style={{ margin: '5px 0 0 0', fontSize: '10px', color: '#a3cf06' }}>
+											Unlocked: {new Date(ach.unlocktime * 1000).toLocaleDateString()}
+										</p>
+									)}
+								</div>
                             </div>
                         ))}
                     </div>
