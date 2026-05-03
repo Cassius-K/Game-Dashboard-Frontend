@@ -1,62 +1,23 @@
-import { useState, useEffect, useRef } from 'react'; // FIXED: Added useRef back to the import
+import { useState, useEffect } from 'react';
 
-export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId }) {
+// NEW: Accept startHydration and hydrationStatus as props from App.jsx
+export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId, linkedXboxId, startHydration, hydrationStatus }) {
     const [megaLibrary, setMegaLibrary] = useState([]);
     const [filter, setFilter] = useState('All');
-    const [sortBy, setSortBy] = useState('Name');
+    const [sortBy, setSortBy] = useState('Name'); // NEW: Controls sorting logic ('Name' or 'Completion')
     
     const [steamSummary, setSteamSummary] = useState(null);
     const [psnSummary, setPsnSummary] = useState(null);
     const [xboxSummary, setXboxSummary] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-	
-	// --- MOVED HYDRATION STATE HERE ---
-    const [hydrationStatus, setHydrationStatus] = useState("");
-    const isHydrating = useRef(false);
 
-    // Initial load and auto-hydration trigger
+    // We use a function inside useEffect so we can call it again on demand
     useEffect(() => {
         loadCentralHub();
-    }, [linkedSteamId, linkedPsnId, linkedXboxId]);
-
-    // --- MOVED HYDRATION LOGIC HERE ---
-    const startHydration = async () => {
-        if (isHydrating.current || megaLibrary.length === 0) return;
-
-        const gamesToHydrate = megaLibrary.filter(g => 
-            (g.completionRate === 0 || g.completionRate === undefined) && g.platform !== 'Xbox'
-        );
-        
-        if (gamesToHydrate.length > 0) {
-            isHydrating.current = true;
-            hydrateQueue(gamesToHydrate);
-        } else {
-            setHydrationStatus("All games are up to date!");
-            setTimeout(() => setHydrationStatus(""), 5000);
-        }
-    };
-
-    const hydrateQueue = async (queue) => {
-        for (let i = 0; i < queue.length; i++) {
-            const game = queue[i];
-            setHydrationStatus(`Hydrating... (${i + 1}/${queue.length}) ${game.name}`);
-
-            try {
-                await fetch(`${API_URL}/api/hydrate/game-completion`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, game })
-                });
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            } catch (err) { console.error(`Failed to hydrate ${game.name}:`, err); }
-        }
-        setHydrationStatus("Hydration complete! Click 'Refresh' to see updated stats.");
-        isHydrating.current = false;
-    };
+    }, [linkedSteamId, linkedPsnId, linkedXboxId]); // Reruns when linked accounts change
 
     const loadCentralHub = async () => {
         setIsLoading(true);
-        setHydrationStatus(""); 
         try {
             // 1. Load Mega Library from DB
             const libRes = await fetch(`${API_URL}/api/library/all/${username}`);
@@ -141,21 +102,29 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
             {/* --- CONSOLIDATED MEGA LIBRARY --- */}
             <div style={{ marginTop: '40px', padding: '20px', backgroundColor: '#171a21', borderRadius: '10px' }}>
+                {/* === UPDATED: Refresh and Hydrate buttons are now side-by-side === */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
                     <h2 style={{ color: 'white', margin: 0 }}>Mega Library ({megaLibrary.length} Games)</h2>
-                    
-                    {/* --- BUTTONS RESTORED --- */}
-                    <button onClick={loadCentralHub} style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }} title="Re-fetch library to see updated completion rates">
+                    <button 
+                        onClick={loadCentralHub} 
+                        style={{ backgroundColor: '#66c0f4', color: 'black', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                        title="Re-fetch library to see updated completion rates"
+                    >
                         🔄 Refresh
                     </button>
-                    <button onClick={startHydration} style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }} title="Scan library for missing completion data">
+                    {/* NEW: This button now calls the startHydration function passed down from App.jsx */}
+                    <button 
+                        onClick={startHydration} 
+                        style={{ backgroundColor: '#cc3333', color: 'white', padding: '5px 10px', fontSize: '12px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                        title="Scan library for missing completion data"
+                    >
                         💧 Hydrate
                     </button>
                 </div>
                 
-                {/* Hydration Status Bar */}
-                {hydrationStatus && <p style={{ color: '#a3cf06', fontStyle: 'italic' }}>{hydrationStatus}</p>}
-                
+                {/* NEW: Displays the global hydration status message from App.jsx */}
+                {hydrationStatus && <p style={{ color: '#a3cf06', fontStyle: 'italic', height: '20px' }}>{hydrationStatus}</p>}
+
                 {/* Filter and Sort Controls */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
                     {/* Platform Filter Buttons */}
@@ -167,7 +136,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
                         <button onClick={() => setFilter('Xbox')} style={{ backgroundColor: filter === 'Xbox' ? '#107c10' : '#333', color: 'white', padding: '5px 10px', marginLeft: '5px' }}>Xbox</button>
                     </div>
 
-                    {/* Sort Dropdown */}
+                    {/* NEW: Sort Dropdown */}
                     <div>
                         <span style={{ color: '#888', marginRight: '10px' }}>Sort By:</span>
                         <select 
@@ -183,7 +152,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 
                 {isLoading ? <p>Loading your empire...</p> : (
                     <div className="games-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center' }}>
-                        {/* Now mapping over processedGames */}
+                        {/* CHANGED: Now mapping over processedGames instead of filteredGames */}
                         {processedGames.map(game => (
                             <div key={game._id} className="game-card" style={{ border: '1px solid #555', padding: '15px', width: '200px', backgroundColor: '#1b2838', borderRadius: '5px', position: 'relative' }}>
                                 
@@ -207,7 +176,7 @@ export default function HomeTab({ username, API_URL, linkedSteamId, linkedPsnId,
 								/>
                                 <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', margin: '5px 0' }}>{game.name}</p>
                                 
-                                {/* Display Completion % on the card */}
+                                {/* NEW: Display Completion % on the card */}
                                 <p style={{ fontSize: '12px', color: '#cca43b', margin: '5px 0 0 0', fontWeight: 'bold' }}>
                                     Completion: {game.completionRate || 0}%
                                 </p>
